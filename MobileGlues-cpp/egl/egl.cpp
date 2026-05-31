@@ -165,12 +165,17 @@ extern "C"
 
     EGL_API EGLContext eglCreateContext(EGLDisplay dpy, EGLConfig config, EGLContext share_context,
                                         const EGLint* attrib_list) {
-        LOG_D("eglCreateContext, dpy: %p, config: %p, share_context: %p, "
-              "attrib_list: %p",
+        LOG_D("eglCreateContext, dpy: %p, config: %p, share_context: %p, attrib_list: %p",
               dpy, config, share_context, attrib_list);
+        if (share_context != EGL_NO_CONTEXT) {
+            LOG_D("[Amethyst] Shared context requested; falling back to EGL_NO_CONTEXT");
+            share_context = EGL_NO_CONTEXT;
+        }
+
         LOAD_EGL(eglCreateContext)
         return egl_eglCreateContext(dpy, config, share_context, attrib_list);
     }
+
 
     EGL_API EGLBoolean eglDestroyContext(EGLDisplay dpy, EGLContext ctx) {
         LOG_D("eglDestroyContext, dpy: %p, ctx: %p", dpy, ctx);

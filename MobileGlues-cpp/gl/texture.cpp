@@ -920,6 +920,16 @@ void glGetTexLevelParameterfv(GLenum target, GLint level, GLenum pname, GLfloat*
             }
         }
     }
+    // Same fix as in glGetTexLevelParameteriv: avoid returning 0 for GL_TEXTURE_INTERNAL_FORMAT.
+    if (pname == GL_TEXTURE_INTERNAL_FORMAT) {
+        TextureObject* tex = mgGetTexObjectByTarget(target);
+        if (tex && tex->internal_format != 0) {
+            (*params) = (GLfloat)tex->internal_format;
+            return;
+        }
+        (*params) = (GLfloat)GL_RGBA;
+        return;
+    }
     GLES.glGetTexLevelParameterfv(target, level, pname, params);
     CHECK_GL_ERROR
 }
@@ -945,6 +955,30 @@ void glGetTexLevelParameteriv(GLenum target, GLint level, GLenum pname, GLint* p
                 return;
             }
         }
+    }
+    // For GL_TEXTURE_INTERNAL_FORMAT, try our tracked TextureObject first.
+    // GLES returns 0 for a newly created texture that has never had storage
+    // allocated (e.g. via glGenTextures without any glTexImage/glTexStorage call),
+    // but desktop OpenGL returns GL_RGBA (0x1908) in that case.
+    // NeoForge's earlyWindowControl path calls GlDevice.createExternalTexture
+    // which queries this immediately after glGenTextures, before any data is
+    // uploaded, causing a crash with "Couldn't find a matching vanilla
+    // TextureFormat for OpenGL internal format id 0".
+    if (pname == GL_TEXTURE_INTERNAL_FORMAT) {
+        TextureObject* tex = mgGetTexObjectByTarget(target);
+        if (tex && tex->internal_format != 0) {
+            LOG_D("glGetTexLevelParameteriv: returning tracked internal_format 0x%x for target %s",
+                  tex->internal_format, glEnumToString(target))
+            (*params) = (GLint)tex->internal_format;
+            return;
+        }
+        // Texture has no tracked format yet (newly generated, no storage allocated).
+        // Desktop GL returns GL_RGBA as the default internal format for uninitialized
+        // textures. Return the same to prevent callers from receiving 0.
+        LOG_D("glGetTexLevelParameteriv: no tracked internal_format for target %s, defaulting to GL_RGBA",
+              glEnumToString(target))
+        (*params) = GL_RGBA;
+        return;
     }
     LOG_D("es.glGetTexLevelParameteriv,target: %s, level: %d, pname: %s", glEnumToString(target), level,
           glEnumToString(pname))

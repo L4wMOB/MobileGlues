@@ -90,6 +90,7 @@ add_library(${CMAKE_PROJECT_NAME} SHARED
     main.cpp
     gl/gl_stub.cpp
     gl/gl_native.cpp
+    gl/sync.cpp
     gl/gl.cpp
     gl/envvars.cpp
     gl/log.cpp

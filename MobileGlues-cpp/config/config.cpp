@@ -1,129 +1,319 @@
-// MobileGlues - config/config.cpp
+// MobileGlues - config/gpu_utils.cpp
 // Copyright (c) 2025-2026 MobileGL-Dev
 // Licensed under the GNU Lesser General Public License v2.1:
 //   https://www.gnu.org/licenses/old-licenses/lgpl-2.1.txt
 // SPDX-License-Identifier: LGPL-2.1-only
 // End of Source File Header
-#include "config.h"
 
-#include "../gl/log.h"
-#include "../gl/mg.h"
-#include "cJSON.h"
-#include <cerrno>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <string>
-#include <sys/stat.h>
+#include "gpu_utils.h"
+#include "../gles/loader.h"
+#if !defined(__APPLE__)
+#include "vulkan/vulkan.h"
+#endif
 
-#define DEBUG 0
+#include <EGL/egl.h>
+#include <cstring>
+#include <optional>
+typedef const char* cstr;
+static const cstr gles3_lib[] = {"libGLESv3_CM", "libGLESv3", nullptr};
+static const cstr egl_libs[] = {"libEGL", nullptr};
+static const cstr vk_lib[] = {"libvulkan", nullptr};
 
-char* DEFAULT_MG_DIRECTORY_PATH = "/sdcard/MG";
+namespace egl_func {
+    PFNEGLGETDISPLAYPROC eglGetDisplay = nullptr;
+    PFNEGLINITIALIZEPROC eglInitialize = nullptr;
+    PFNEGLCHOOSECONFIGPROC eglChooseConfig = nullptr;
+    PFNEGLCREATECONTEXTPROC eglCreateContext = nullptr;
+    PFNEGLMAKECURRENTPROC eglMakeCurrent = nullptr;
+    PFNEGLDESTROYCONTEXTPROC eglDestroyContext = nullptr;
+    PFNEGLTERMINATEPROC eglTerminate = nullptr;
+} // namespace egl_func
 
-bool is_custom_mg_dir = false;
-char* mg_directory_path = nullptr;
-char* config_file_path = nullptr;
-char* log_file_path = nullptr;
-char* glsl_cache_file_path = nullptr;
-
-static cJSON* config_json = nullptr;
-
-int initialized = 0;
-
-char* concatenate(char* str1, char* str2) {
-    std::string str = std::string(str1) + str2;
-    char* result = new char[str.size() + 1];
-    strcpy(result, str.c_str());
-    return result;
+template <typename T>
+static void* open_lib(const T names[], const char* override) {
+    void* handle = nullptr;
+    int flags = RTLD_LOCAL | RTLD_NOW;
+    if (override) {
+        handle = dlopen(override, flags);
+        if (handle) return handle;
+    }
+    for (int i = 0; names[i]; ++i) {
+        handle = dlopen(names[i], flags);
+        if (handle) break;
+    }
+    return handle;
 }
 
-int check_path() {
-    if (!mg_directory_path) {
-        char* var = getenv("MG_DIR_PATH");
-        is_custom_mg_dir = var ? true : false;
-        mg_directory_path = var ? strdup(var) : DEFAULT_MG_DIRECTORY_PATH;
-    }
-    config_file_path = concatenate(mg_directory_path, "/config.json");
-    log_file_path = concatenate(mg_directory_path, "/latest.log");
-    glsl_cache_file_path = concatenate(mg_directory_path, "/glsl_cache.tmp");
+static bool loadEGLFunctions(void* lib) {
+    if (!lib) return false;
+    egl_func::eglGetDisplay = (PFNEGLGETDISPLAYPROC)dlsym(lib, "eglGetDisplay");
+    egl_func::eglInitialize = (PFNEGLINITIALIZEPROC)dlsym(lib, "eglInitialize");
+    egl_func::eglChooseConfig = (PFNEGLCHOOSECONFIGPROC)dlsym(lib, "eglChooseConfig");
+    egl_func::eglCreateContext = (PFNEGLCREATECONTEXTPROC)dlsym(lib, "eglCreateContext");
+    egl_func::eglMakeCurrent = (PFNEGLMAKECURRENTPROC)dlsym(lib, "eglMakeCurrent");
+    egl_func::eglDestroyContext = (PFNEGLDESTROYCONTEXTPROC)dlsym(lib, "eglDestroyContext");
+    egl_func::eglTerminate = (PFNEGLTERMINATEPROC)dlsym(lib, "eglTerminate");
 
-    if (mkdir(mg_directory_path, 0755) != 0 && errno != EEXIST) {
-        LOG_E("Error creating MG directory.\n")
+    return egl_func::eglGetDisplay && egl_func::eglInitialize && egl_func::eglChooseConfig &&
+           egl_func::eglCreateContext && egl_func::eglMakeCurrent && egl_func::eglDestroyContext &&
+           egl_func::eglTerminate;
+}
+
+std::string getGPUInfo() {
+    void* egllib = open_lib(egl_libs, nullptr);
+    if (!loadEGLFunctions(egllib)) {
+        if (egllib) dlclose(egllib);
+        return std::string();
+    }
+
+    EGLDisplay display = egl_func::eglGetDisplay(EGL_DEFAULT_DISPLAY);
+    if (display == EGL_NO_DISPLAY) {
+        egl_func::eglTerminate(display);
+        dlclose(egllib);
+        return std::string();
+    }
+    if (egl_func::eglInitialize(display, nullptr, nullptr) != EGL_TRUE) {
+        egl_func::eglTerminate(display);
+        dlclose(egllib);
+        return std::string();
+    }
+
+    const EGLint attribs[] = {EGL_BLUE_SIZE,
+                              8,
+                              EGL_GREEN_SIZE,
+                              8,
+                              EGL_RED_SIZE,
+                              8,
+                              EGL_ALPHA_SIZE,
+                              8,
+                              EGL_DEPTH_SIZE,
+                              24,
+                              EGL_SURFACE_TYPE,
+                              EGL_PBUFFER_BIT,
+                              EGL_RENDERABLE_TYPE,
+                              EGL_OPENGL_ES2_BIT,
+                              EGL_NONE};
+    EGLint numConfigs = 0;
+    if (egl_func::eglChooseConfig(display, attribs, nullptr, 0, &numConfigs) != EGL_TRUE || numConfigs == 0) {
+        egl_func::eglTerminate(display);
+        dlclose(egllib);
+        return std::string();
+    }
+    EGLConfig config;
+    egl_func::eglChooseConfig(display, attribs, &config, 1, &numConfigs);
+
+    const EGLint ctxAttribs[] = {EGL_CONTEXT_CLIENT_VERSION, 3, EGL_NONE};
+    EGLContext ctx = egl_func::eglCreateContext(display, config, EGL_NO_CONTEXT, ctxAttribs);
+    if (ctx == EGL_NO_CONTEXT) {
+        egl_func::eglTerminate(display);
+        dlclose(egllib);
+        return std::string();
+    }
+
+    if (egl_func::eglMakeCurrent(display, EGL_NO_SURFACE, EGL_NO_SURFACE, ctx) != EGL_TRUE) {
+        egl_func::eglDestroyContext(display, ctx);
+        egl_func::eglTerminate(display);
+        dlclose(egllib);
+        return std::string();
+    }
+
+    void* glesLib = open_lib(gles3_lib, nullptr);
+    std::string renderer;
+    if (glesLib) {
+        auto glGetString = (const GLubyte* (*)(GLenum))dlsym(glesLib, "glGetString");
+        if (glGetString) {
+            renderer = reinterpret_cast<const char*>(glGetString(GL_RENDERER));
+        }
+        dlclose(glesLib);
+    }
+
+    egl_func::eglMakeCurrent(display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+    egl_func::eglDestroyContext(display, ctx);
+    egl_func::eglTerminate(display);
+    dlclose(egllib);
+
+    return renderer;
+}
+
+int isAdreno(const char* gpu) {
+    //    const char* gpu = getGPUInfo();
+    if (!gpu) return 0;
+    return strstr(gpu, "Adreno") != nullptr;
+}
+
+int isAdreno740(const char* gpu) {
+    //    const char* gpu = getGPUInfo();
+    if (!gpu) return 0;
+    return isAdreno(gpu) && (strstr(gpu, "740") != nullptr);
+}
+
+int isAdreno730(const char* gpu) {
+    //    const char* gpu = getGPUInfo();
+    if (!gpu) return 0;
+    return isAdreno(gpu) && (strstr(gpu, "730") != nullptr);
+}
+
+bool checkIfANGLESupported(const char* gpu) {
+    return !isAdreno730(gpu) && !isAdreno740(gpu) && hasVulkan12();
+}
+
+int isAdreno830(const char* gpu) {
+    //    const char* gpu = getGPUInfo();
+    if (!gpu) return 0;
+    return isAdreno(gpu) && (strstr(gpu, "830") != nullptr);
+}
+
+static std::optional<int> hasVk12;
+int hasVulkan12() {
+    if (hasVk12.has_value()) return hasVk12.value();
+    void* vulkan_lib = open_lib(vk_lib, nullptr);
+    if (!vulkan_lib) return 0;
+
+#ifndef __APPLE__
+
+    typedef VkResult (*PFN_vkEnumerateInstanceExtensionProperties)(const char*, uint32_t*, VkExtensionProperties*);
+    typedef VkResult (*PFN_vkCreateInstance)(const VkInstanceCreateInfo*, const VkAllocationCallbacks*, VkInstance*);
+    typedef void (*PFN_vkDestroyInstance)(VkInstance, const VkAllocationCallbacks*);
+    typedef VkResult (*PFN_vkEnumeratePhysicalDevices)(VkInstance, uint32_t*, VkPhysicalDevice*);
+    typedef void (*PFN_vkGetPhysicalDeviceProperties)(VkPhysicalDevice, VkPhysicalDeviceProperties*);
+
+    auto vkEnumerateInstanceExtensionProperties =
+        (PFN_vkEnumerateInstanceExtensionProperties)dlsym(vulkan_lib, "vkEnumerateInstanceExtensionProperties");
+    auto vkCreateInstance = (PFN_vkCreateInstance)dlsym(vulkan_lib, "vkCreateInstance");
+    auto vkDestroyInstance = (PFN_vkDestroyInstance)dlsym(vulkan_lib, "vkDestroyInstance");
+    auto vkEnumeratePhysicalDevices = (PFN_vkEnumeratePhysicalDevices)dlsym(vulkan_lib, "vkEnumeratePhysicalDevices");
+    auto vkGetPhysicalDeviceProperties =
+        (PFN_vkGetPhysicalDeviceProperties)dlsym(vulkan_lib, "vkGetPhysicalDeviceProperties");
+
+    if (!vkEnumerateInstanceExtensionProperties || !vkCreateInstance || !vkDestroyInstance ||
+        !vkEnumeratePhysicalDevices || !vkGetPhysicalDeviceProperties) {
+        dlclose(vulkan_lib);
         return 0;
     }
+
+    VkResult result = VK_SUCCESS;
+    uint32_t instanceExtensionCount = 0;
+
+    result = vkEnumerateInstanceExtensionProperties(nullptr, &instanceExtensionCount, nullptr);
+    if (result != VK_SUCCESS) {
+        return 0;
+    }
+
+    VkApplicationInfo appInfo = {};
+    appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    appInfo.pNext = nullptr;
+    appInfo.pApplicationName = "Vulkan Check";
+    appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
+    appInfo.pEngineName = "MobileGlues";
+    appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
+    appInfo.apiVersion = VK_API_VERSION_1_3;
+
+    VkInstanceCreateInfo createInfo = {};
+    createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+    createInfo.pNext = nullptr;
+    createInfo.flags = 0;
+    createInfo.pApplicationInfo = &appInfo;
+    createInfo.enabledLayerCount = 0;
+    createInfo.ppEnabledLayerNames = nullptr;
+    createInfo.enabledExtensionCount = 0;
+    createInfo.ppEnabledExtensionNames = nullptr;
+
+    VkInstance instance = {};
+    result = vkCreateInstance(&createInfo, nullptr, &instance);
+    if (result != VK_SUCCESS) {
+        hasVk12 = false;
+        return 0;
+    }
+
+    uint32_t gpuCount = 0;
+    result = vkEnumeratePhysicalDevices(instance, &gpuCount, nullptr);
+    if (result != VK_SUCCESS || gpuCount == 0) {
+        vkDestroyInstance(instance, nullptr);
+        hasVk12 = false;
+        return 0;
+    }
+
+    auto* physicalDevices = (VkPhysicalDevice*)malloc(sizeof(VkPhysicalDevice) * gpuCount);
+    vkEnumeratePhysicalDevices(instance, &gpuCount, physicalDevices);
+
+    for (uint32_t i = 0; i < gpuCount; i++) {
+        VkPhysicalDeviceProperties deviceProperties;
+        vkGetPhysicalDeviceProperties(physicalDevices[i], &deviceProperties);
+
+        if (deviceProperties.apiVersion >= VK_API_VERSION_1_2) {
+            vkDestroyInstance(instance, nullptr);
+            hasVk12 = true;
+            return 1;
+        }
+    }
+
+    free(physicalDevices);
+
+    vkDestroyInstance(instance, nullptr);
+
+    dlclose(vulkan_lib);
+    hasVk12 = false;
+    return 0;
+
+#endif
+}
+
+// ---------------------------------------------------------------------------
+// Apple GPU helpers (iOS / macOS only)
+// ---------------------------------------------------------------------------
+// On iOS the GLES renderer string returned by glGetString(GL_RENDERER) is
+// typically something like:
+//   "Apple A13 GPU"
+//   "Apple A15 GPU"
+//   "Apple M1 GPU"
+// We use simple substring matching â same pattern used for Adreno above.
+// ---------------------------------------------------------------------------
+
+#ifdef __APPLE__
+
+int isAppleGPU(const char* gpu) {
+    if (!gpu) return 0;
+    return strstr(gpu, "Apple") != nullptr;
+}
+
+// A13 is used in: iPhone 11, iPhone 11 Pro/Max, iPhone SE (2nd gen), iPod touch 7th gen
+int isAppleA13GPU(const char* gpu) {
+    if (!gpu) return 0;
+    return isAppleGPU(gpu) && (strstr(gpu, "A13") != nullptr);
+}
+
+// Tier classification for tuning purposes:
+//   Tier 1: A7-A11  (GLES 3.0, Metal feature-set 3/4 â limited compute)
+//   Tier 2: A12-A14 (GLES 3.2+, Metal GPU family 7+ â A13 is here)
+//   Tier 3: A15+    (large caches, full compute, Neural Engine assist)
+int appleGPUTier(const char* gpu) {
+    if (!isAppleGPU(gpu)) return 0;
+
+    // M-series (macOS / iPad Pro) â treat same as Tier 3
+    if (strstr(gpu, " M1") || strstr(gpu, " M2") ||
+        strstr(gpu, " M3") || strstr(gpu, " M4")) {
+        return 3;
+    }
+
+    // Extract the chip number (A7 â¦ A18 â¦)
+    // Walk through common ones explicitly to avoid regex overhead.
+    const char* tier3[] = {"A15", "A16", "A17", "A18", nullptr};
+    for (int i = 0; tier3[i]; i++) {
+        if (strstr(gpu, tier3[i])) return 3;
+    }
+
+    const char* tier2[] = {"A12", "A13", "A14", nullptr};
+    for (int i = 0; tier2[i]; i++) {
+        if (strstr(gpu, tier2[i])) return 2;
+    }
+
+    const char* tier1[] = {"A7", "A8", "A9", "A10", "A11", nullptr};
+    for (int i = 0; tier1[i]; i++) {
+        if (strstr(gpu, tier1[i])) return 1;
+    }
+
+    // Unknown Apple GPU â be conservative
     return 1;
 }
 
-int config_refresh() {
-    LOG_D("MG_DIRECTORY_PATH=%s", mg_directory_path)
-    LOG_D("CONFIG_FILE_PATH=%s", config_file_path)
-    LOG_D("LOG_FILE_PATH=%s", log_file_path)
-    LOG_D("GLSL_CACHE_FILE_PATH=%s", glsl_cache_file_path)
-
-    FILE* file = fopen(config_file_path, "r");
-    if (file == NULL) {
-        LOG_E("Unable to open config file %s", config_file_path);
-        return 0;
-    }
-
-    fseek(file, 0, SEEK_END);
-    long file_size = ftell(file);
-    fseek(file, 0, SEEK_SET);
-
-    char* file_content = (char*)malloc(file_size + 1);
-    if (file_content == NULL) {
-        LOG_E("Unable to allocate memory for file content");
-        fclose(file);
-        return 0;
-    }
-
-    fread(file_content, 1, file_size, file);
-    fclose(file);
-    file_content[file_size] = '\0';
-
-    config_json = cJSON_Parse(file_content);
-    free(file_content);
-
-    if (config_json == NULL) {
-        LOG_E("Error parsing config JSON: %s\n", cJSON_GetErrorPtr());
-        return 0;
-    }
-
-    initialized = 1;
-    return 1;
-}
-
-int config_get_int(char* name) {
-    if (config_json == NULL) {
-        return -1;
-    }
-
-    cJSON* item = cJSON_GetObjectItem(config_json, name);
-    if (item == NULL || !cJSON_IsNumber(item)) {
-        LOG_D("Config item '%s' not found or not an integer.\n", name);
-        return -1;
-    }
-
-    return item->valueint;
-}
-
-char* config_get_string(char* name) {
-    if (config_json == NULL) {
-        return NULL;
-    }
-
-    cJSON* item = cJSON_GetObjectItem(config_json, name);
-    if (item == NULL || !cJSON_IsString(item)) {
-        LOG_D("Config item '%s' not found or not a string.\n", name);
-        return "";
-    }
-
-    return item->valuestring;
-}
-
-void config_cleanup() {
-    if (config_json != NULL) {
-        cJSON_Delete(config_json);
-        config_json = NULL;
-    }
-}
+#endif // __APPLE__

@@ -6,6 +6,7 @@
 // End of Source File Header
 
 #include "config/settings.h"
+#include "config/config.h"
 #include "egl/egl.h"
 #include "egl/loader.h"
 #include "gl/envvars.h"

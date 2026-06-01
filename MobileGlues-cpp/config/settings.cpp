@@ -114,7 +114,7 @@ void init_settings() {
     if (tier >= 3) {
         global_settings.fsr1_setting = FSR1_Quality_Preset::UltraQuality;
     } else if (tier == 2) {
-        global_settings.fsr1_setting = FSR1_Quality_Preset::Quality;
+        global_settings.fsr1_setting = FSR1_Quality_Preset::Disabled;
     } else {
         global_settings.fsr1_setting = FSR1_Quality_Preset::Disabled;
     }

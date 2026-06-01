@@ -422,6 +422,10 @@ void init_settings_post() {
         }
         break;
     }
+
+    // Forcing BaseVertex aims to drastically reduce CPU overhead.
+    global_settings.multidraw_mode = multidraw_mode_t::PreferBaseVertex;
+    LOG_V("[MobileGlues] Setting: forced multidrawMode to PreferBaseVertex!");
 }
 
 std::string dump_settings_string(std::string prefix) {

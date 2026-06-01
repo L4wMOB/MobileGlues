@@ -257,3 +257,63 @@ int hasVulkan12() {
 
 #endif
 }
+
+// ---------------------------------------------------------------------------
+// Apple GPU helpers (iOS / macOS only)
+// ---------------------------------------------------------------------------
+// On iOS the GLES renderer string returned by glGetString(GL_RENDERER) is
+// typically something like:
+//   "Apple A13 GPU"
+//   "Apple A15 GPU"
+//   "Apple M1 GPU"
+// We use simple substring matching â same pattern used for Adreno above.
+// ---------------------------------------------------------------------------
+
+#ifdef __APPLE__
+
+int isAppleGPU(const char* gpu) {
+    if (!gpu) return 0;
+    return strstr(gpu, "Apple") != nullptr;
+}
+
+// A13 is used in: iPhone 11, iPhone 11 Pro/Max, iPhone SE (2nd gen), iPod touch 7th gen
+int isAppleA13GPU(const char* gpu) {
+    if (!gpu) return 0;
+    return isAppleGPU(gpu) && (strstr(gpu, "A13") != nullptr);
+}
+
+// Tier classification for tuning purposes:
+//   Tier 1: A7-A11  (GLES 3.0, Metal feature-set 3/4 â limited compute)
+//   Tier 2: A12-A14 (GLES 3.2+, Metal GPU family 7+ â A13 is here)
+//   Tier 3: A15+    (large caches, full compute, Neural Engine assist)
+int appleGPUTier(const char* gpu) {
+    if (!isAppleGPU(gpu)) return 0;
+
+    // M-series (macOS / iPad Pro) â treat same as Tier 3
+    if (strstr(gpu, " M1") || strstr(gpu, " M2") ||
+        strstr(gpu, " M3") || strstr(gpu, " M4")) {
+        return 3;
+    }
+
+    // Extract the chip number (A7 â¦ A18 â¦)
+    // Walk through common ones explicitly to avoid regex overhead.
+    const char* tier3[] = {"A15", "A16", "A17", "A18", nullptr};
+    for (int i = 0; tier3[i]; i++) {
+        if (strstr(gpu, tier3[i])) return 3;
+    }
+
+    const char* tier2[] = {"A12", "A13", "A14", nullptr};
+    for (int i = 0; tier2[i]; i++) {
+        if (strstr(gpu, tier2[i])) return 2;
+    }
+
+    const char* tier1[] = {"A7", "A8", "A9", "A10", "A11", nullptr};
+    for (int i = 0; tier1[i]; i++) {
+        if (strstr(gpu, tier1[i])) return 1;
+    }
+
+    // Unknown Apple GPU â be conservative
+    return 1;
+}
+
+#endif // __APPLE__

@@ -282,38 +282,11 @@ int isAppleA13GPU(const char* gpu) {
     return isAppleGPU(gpu) && (strstr(gpu, "A13") != nullptr);
 }
 
-// Tier classification for tuning purposes:
-//   Tier 1: A7-A11  (GLES 3.0, Metal feature-set 3/4 â limited compute)
-//   Tier 2: A12-A14 (GLES 3.2+, Metal GPU family 7+ â A13 is here)
-//   Tier 3: A15+    (large caches, full compute, Neural Engine assist)
 int appleGPUTier(const char* gpu) {
-    if (!isAppleGPU(gpu)) return 0;
-
-    // M-series (macOS / iPad Pro) â treat same as Tier 3
-    if (strstr(gpu, " M1") || strstr(gpu, " M2") ||
-        strstr(gpu, " M3") || strstr(gpu, " M4")) {
-        return 3;
-    }
-
-    // Extract the chip number (A7 â¦ A18 â¦)
-    // Walk through common ones explicitly to avoid regex overhead.
-    const char* tier3[] = {"A15", "A16", "A17", "A18", nullptr};
-    for (int i = 0; tier3[i]; i++) {
-        if (strstr(gpu, tier3[i])) return 3;
-    }
-
-    const char* tier2[] = {"A12", "A13", "A14", nullptr};
-    for (int i = 0; tier2[i]; i++) {
-        if (strstr(gpu, tier2[i])) return 2;
-    }
-
-    const char* tier1[] = {"A7", "A8", "A9", "A10", "A11", nullptr};
-    for (int i = 0; tier1[i]; i++) {
-        if (strstr(gpu, tier1[i])) return 1;
-    }
-
-    // Unknown Apple GPU â be conservative
-    return 1;
+    // Force Tier 2 (Apple A13 Bionic / iPhone 11)
+    // Because getGPUInfo() is called before EGL initialization, the GPU name is always empty
+    // Instead of falling back to Tier 0, we hardcode this to Tier 2 for maximum performance.
+    return 2;
 }
 
 #endif // __APPLE__

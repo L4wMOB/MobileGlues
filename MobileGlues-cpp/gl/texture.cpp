@@ -466,8 +466,15 @@ void internal_convert(GLenum* internal_format, GLenum* type, GLenum* format) {
     default:
         // fallback handling for GL_RGB8, GL_RGBA16_SNORM etc.
         if (*internal_format == GL_RGB8) {
+            // Apple GPU (Metal/GLES) does not support GL_RGB8 as a renderable
+            // color attachment — only GL_RGBA8 is guaranteed. Sodium and other
+            // mods create FBOs with GL_RGB8 textures; without this conversion
+            // the alpha channel is undefined (alpha=0), making everything
+            // transparent. Promote to GL_RGBA8 so the FBO is complete and
+            // renders correctly.
+            *internal_format = GL_RGBA8;
             if (type && *type != GL_UNSIGNED_BYTE) *type = GL_UNSIGNED_BYTE;
-            if (format) *format = GL_RGB;
+            if (format) *format = GL_RGBA;
         } else if (*internal_format == GL_RGBA16_SNORM) {
             if (type && *type != GL_SHORT) *type = GL_SHORT;
         }

@@ -101,6 +101,7 @@ void init_settings() {
     //   glDrawElementsBaseVertexOES even without advertising the extension
     //   string; init_settings_post() probes the function pointer directly
     //   and overrides basevertex=true if found (see Apple-specific block).
+    //   This keeps OpenGL at 4.3 and makes Sodium work correctly.
     if (tier >= 2) {
         global_settings.multidraw_mode = multidraw_mode_t::PreferBaseVertex;
     } else {

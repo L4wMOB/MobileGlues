@@ -260,13 +260,16 @@ NATIVE_FUNCTION_HEAD(void, glInvalidateFramebuffer, GLenum target, GLsizei numAt
 NATIVE_FUNCTION_HEAD(void, glInvalidateSubFramebuffer, GLenum target, GLsizei numAttachments, const GLenum *attachments, GLint x, GLint y, GLsizei width, GLsizei height) NATIVE_FUNCTION_END_NO_RETURN(void, glInvalidateSubFramebuffer, target,numAttachments,attachments,x,y,width,height)
 //NATIVE_FUNCTION_HEAD(void, glTexStorage2D, GLenum target, GLsizei levels, GLenum internalformat, GLsizei width, GLsizei height) NATIVE_FUNCTION_END_NO_RETURN(void, glTexStorage2D, target,levels,internalformat,width,height)
 //NATIVE_FUNCTION_HEAD(void, glTexStorage3D, GLenum target, GLsizei levels, GLenum internalformat, GLsizei width, GLsizei height, GLsizei depth) NATIVE_FUNCTION_END_NO_RETURN(void, glTexStorage3D, target,levels,internalformat,width,height,depth)
-NATIVE_FUNCTION_HEAD(void, glGetInternalformativ, GLenum target, GLenum internalformat, GLenum pname, GLsizei bufSize, GLint *params)
-    // Apple GPU does not support GL_RGB8 as a renderable format, but we
-    // promote GL_RGB8 -> GL_RGBA8 in internal_convert(). So we must also
-    // intercept internalformat queries to avoid mods (e.g. Sodium) skipping
-    // GL_RGB8 textures entirely or falling back to slower paths.
-    if (internalformat == GL_RGB8) {
-        internalformat = GL_RGBA8;
+NATIVE_FUNCTION_HEAD(void, glGetInternalformativ, GLenum target, GLenum internalformat, GLenum pname, GLsizei bufSize, GLint *params) {
+    // Apple GPU does not support GL_RGB* (no alpha) as renderable formats.
+    // internal_convert() promotes them to RGBA equivalents, so mirror that here
+    // so callers (e.g. Sodium) don't skip these formats or fall back to slow paths.
+    switch (internalformat) {
+        case GL_RGB8:   internalformat = GL_RGBA8;   break;
+        case GL_RGB16F: internalformat = GL_RGBA16F;  break;
+        case GL_RGB32F: internalformat = GL_RGBA32F;  break;
+        case GL_SRGB8:  internalformat = GL_SRGB8_ALPHA8; break;
+        default: break;
     }
     GLES.glGetInternalformativ(target, internalformat, pname, bufSize, params);
 }

@@ -613,7 +613,23 @@ void init_target_gles() {
             g_gles_func.glDrawElementsBaseVertex =
                 (glDrawElementsBaseVertex_PTR)proc_address(gles, "glDrawElementsBaseVertexEXT");
         } else {
+#if defined(__APPLE__)
+            // Apple's Metal-backed GLES layer exposes glDrawElementsBaseVertexOES
+            // at the symbol level even when the extension is NOT in the extension
+            // string.  Probe it directly so PreferBaseVertex mode works with Sodium.
+            g_gles_func.glDrawElementsBaseVertex =
+                (glDrawElementsBaseVertex_PTR)proc_address(gles, "glDrawElementsBaseVertexOES");
+            if (g_gles_func.glDrawElementsBaseVertex != nullptr) {
+                LOG_I("[MobileGlues] Apple: glDrawElementsBaseVertexOES resolved via direct probe (not in ext string)")
+                // Mark cap so init_settings_post() picks PreferBaseVertex
+                g_gles_caps.GL_OES_draw_elements_base_vertex = 1;
+            } else {
+                LOG_W("[MobileGlues] Apple: glDrawElementsBaseVertexOES probe failed, basevertex emulation will be used")
+                g_gles_func.glDrawElementsBaseVertex = nullptr;
+            }
+#else
             g_gles_func.glDrawElementsBaseVertex = nullptr;
+#endif
         }
     }
 }

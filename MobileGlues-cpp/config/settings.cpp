@@ -91,14 +91,18 @@ void init_settings() {
     global_settings.custom_gl_version = Version(43);   // 4.3
 
     // MultiDraw mode:
-    //   A12+ supports GL_EXT_multi_draw_indirect via Metal indirect command
-    //   buffers.  Using PreferMultidrawIndirect collapses many glDraw* calls
-    //   into a single GPU submission, which is exactly what cures the
-    //   VulkanMod-style draw-call storm at chunk 8 render distance.
-    //   Fall back to PreferIndirect if the extension isn't detected later in
-    //   init_settings_post(); DrawElements is the worst-case safety net.
+    //   GL_EXT_multi_draw_indirect is NOT available on Apple's Metal-backed
+    //   GLES layer (confirmed: "Not Detected GL_EXT_multi_draw_indirect!").
+    //   PreferMultidrawIndirect therefore falls through to DrawElements in
+    //   init_settings_post(), breaking Sodium (visual glitch/stuck in
+    //   non-flat worlds when using basevertex multidraw).
+    //
+    //   Fix: use PreferBaseVertex for tier 2+ (A12-A14).  Apple exposes
+    //   glDrawElementsBaseVertexOES even without advertising the extension
+    //   string; init_settings_post() probes the function pointer directly
+    //   and overrides basevertex=true if found (see Apple-specific block).
     if (tier >= 2) {
-        global_settings.multidraw_mode = multidraw_mode_t::PreferMultidrawIndirect;
+        global_settings.multidraw_mode = multidraw_mode_t::PreferBaseVertex;
     } else {
         global_settings.multidraw_mode = multidraw_mode_t::PreferIndirect;
     }
@@ -364,6 +368,16 @@ void init_settings_post() {
                       (g_gles_caps.major == 3 && g_gles_caps.minor >= 2) || (g_gles_caps.major > 3);
     bool indirect = (g_gles_caps.major == 3 && g_gles_caps.minor >= 1) || (g_gles_caps.major > 3);
 
+#if defined(__APPLE__)
+    // On Apple's Metal-backed GLES layer, glDrawElementsBaseVertexOES is available
+    // but NOT advertised in the extension string (GL_MAJOR_VERSION reports 3.0).
+    // If the function pointer was successfully resolved in loader.cpp, trust it.
+    if (!basevertex && GLES.glDrawElementsBaseVertex != nullptr) {
+        LOG_V("[MobileGlues] Apple GLES: glDrawElementsBaseVertex available despite missing extension string, forcing basevertex=true")
+        basevertex = true;
+    }
+#endif
+
     switch (global_settings.multidraw_mode) {
     case multidraw_mode_t::PreferIndirect:
         LOG_V("multidrawMode = PreferIndirect")
@@ -422,10 +436,6 @@ void init_settings_post() {
         }
         break;
     }
-
-    // Forcing BaseVertex aims to drastically reduce CPU overhead.
-    global_settings.multidraw_mode = multidraw_mode_t::PreferBaseVertex;
-    LOG_V("[MobileGlues] Setting: forced multidrawMode to PreferBaseVertex!");
 }
 
 std::string dump_settings_string(std::string prefix) {

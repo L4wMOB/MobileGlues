@@ -295,11 +295,19 @@ void internal_convert(GLenum* internal_format, GLenum* type, GLenum* format) {
         LOG_E("GL_COMPRESSED_RED_RGTC1 or GL_COMPRESSED_RG_RGTC2 is not supported!");
         break;
     case GL_SRGB8:
+        // Apple GPU: GL_SRGB8 (no alpha) not renderable; promote to GL_SRGB8_ALPHA8
+        *internal_format = GL_SRGB8_ALPHA8;
         if (type) *type = GL_UNSIGNED_BYTE;
+        if (format) *format = GL_RGBA;
         break;
     case GL_RGBA32F:
-    case GL_RGB32F:
         if (type) *type = GL_FLOAT;
+        break;
+    case GL_RGB32F:
+        // Apple GPU: GL_RGB32F not renderable; promote to GL_RGBA32F
+        *internal_format = GL_RGBA32F;
+        if (type) *type = GL_FLOAT;
+        if (format) *format = GL_RGBA;
         break;
     case GL_RGB9_E5:
         if (type) *type = GL_UNSIGNED_INT_5_9_9_9_REV;
@@ -338,13 +346,11 @@ void internal_convert(GLenum* internal_format, GLenum* type, GLenum* format) {
         if (type) *type = GL_FLOAT;
         break;
     case GL_RGB16:
-        *internal_format = GL_RGB16F;
-        if (type) *type = GL_HALF_FLOAT;
-        if (format) *format = GL_RGB;
-        break;
     case GL_RGB16F:
+        // Apple GPU: GL_RGB16F not renderable; promote to GL_RGBA16F
+        *internal_format = GL_RGBA16F;
         if (type) *type = GL_HALF_FLOAT;
-        if (format) *format = GL_RGB;
+        if (format) *format = GL_RGBA;
         break;
     case GL_RG16:
         *internal_format = GL_RG16F;
@@ -466,12 +472,7 @@ void internal_convert(GLenum* internal_format, GLenum* type, GLenum* format) {
     default:
         // fallback handling for GL_RGB8, GL_RGBA16_SNORM etc.
         if (*internal_format == GL_RGB8) {
-            // Apple GPU (Metal/GLES) does not support GL_RGB8 as a renderable
-            // color attachment — only GL_RGBA8 is guaranteed. Sodium and other
-            // mods create FBOs with GL_RGB8 textures; without this conversion
-            // the alpha channel is undefined (alpha=0), making everything
-            // transparent. Promote to GL_RGBA8 so the FBO is complete and
-            // renders correctly.
+            // Apple GPU: GL_RGB8 not renderable as FBO attachment; promote to GL_RGBA8
             *internal_format = GL_RGBA8;
             if (type && *type != GL_UNSIGNED_BYTE) *type = GL_UNSIGNED_BYTE;
             if (format) *format = GL_RGBA;

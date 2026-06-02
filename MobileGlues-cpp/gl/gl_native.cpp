@@ -260,7 +260,16 @@ NATIVE_FUNCTION_HEAD(void, glInvalidateFramebuffer, GLenum target, GLsizei numAt
 NATIVE_FUNCTION_HEAD(void, glInvalidateSubFramebuffer, GLenum target, GLsizei numAttachments, const GLenum *attachments, GLint x, GLint y, GLsizei width, GLsizei height) NATIVE_FUNCTION_END_NO_RETURN(void, glInvalidateSubFramebuffer, target,numAttachments,attachments,x,y,width,height)
 //NATIVE_FUNCTION_HEAD(void, glTexStorage2D, GLenum target, GLsizei levels, GLenum internalformat, GLsizei width, GLsizei height) NATIVE_FUNCTION_END_NO_RETURN(void, glTexStorage2D, target,levels,internalformat,width,height)
 //NATIVE_FUNCTION_HEAD(void, glTexStorage3D, GLenum target, GLsizei levels, GLenum internalformat, GLsizei width, GLsizei height, GLsizei depth) NATIVE_FUNCTION_END_NO_RETURN(void, glTexStorage3D, target,levels,internalformat,width,height,depth)
-NATIVE_FUNCTION_HEAD(void, glGetInternalformativ, GLenum target, GLenum internalformat, GLenum pname, GLsizei bufSize, GLint *params) NATIVE_FUNCTION_END_NO_RETURN(void, glGetInternalformativ, target,internalformat,pname,bufSize,params)
+NATIVE_FUNCTION_HEAD(void, glGetInternalformativ, GLenum target, GLenum internalformat, GLenum pname, GLsizei bufSize, GLint *params) {
+    // Apple GPU does not support GL_RGB8 as a renderable format, but we
+    // promote GL_RGB8 -> GL_RGBA8 in internal_convert(). So we must also
+    // intercept internalformat queries to avoid mods (e.g. Sodium) skipping
+    // GL_RGB8 textures entirely or falling back to slower paths.
+    if (internalformat == GL_RGB8) {
+        internalformat = GL_RGBA8;
+    }
+    GLES.glGetInternalformativ(target, internalformat, pname, bufSize, params);
+}
 //NATIVE_FUNCTION_HEAD(void, glDispatchCompute, GLuint num_groups_x, GLuint num_groups_y, GLuint num_groups_z) NATIVE_FUNCTION_END_NO_RETURN(void, glDispatchCompute, num_groups_x,num_groups_y,num_groups_z)
 NATIVE_FUNCTION_HEAD(void, glDispatchComputeIndirect, GLintptr indirect) NATIVE_FUNCTION_END_NO_RETURN(void, glDispatchComputeIndirect, indirect)
 NATIVE_FUNCTION_HEAD(void, glDrawArraysIndirect, GLenum mode, const void *indirect) NATIVE_FUNCTION_END_NO_RETURN(void, glDrawArraysIndirect, mode,indirect)

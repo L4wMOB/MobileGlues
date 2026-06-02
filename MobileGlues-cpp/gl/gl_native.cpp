@@ -261,18 +261,24 @@ NATIVE_FUNCTION_HEAD(void, glInvalidateSubFramebuffer, GLenum target, GLsizei nu
 //NATIVE_FUNCTION_HEAD(void, glTexStorage2D, GLenum target, GLsizei levels, GLenum internalformat, GLsizei width, GLsizei height) NATIVE_FUNCTION_END_NO_RETURN(void, glTexStorage2D, target,levels,internalformat,width,height)
 //NATIVE_FUNCTION_HEAD(void, glTexStorage3D, GLenum target, GLsizei levels, GLenum internalformat, GLsizei width, GLsizei height, GLsizei depth) NATIVE_FUNCTION_END_NO_RETURN(void, glTexStorage3D, target,levels,internalformat,width,height,depth)
 NATIVE_FUNCTION_HEAD(void, glGetInternalformativ, GLenum target, GLenum internalformat, GLenum pname, GLsizei bufSize, GLint *params)
-    // Apple GPU does not support GL_RGB* (no alpha) as renderable formats.
-    // internal_convert() promotes them to RGBA equivalents, so mirror that here
-    // so callers (e.g. Sodium) don't skip these formats or fall back to slow paths.
+    // Mirror the texture promotions so Sodium doesn't fail format support queries
+    GLenum orig_internal = internalformat;
     switch (internalformat) {
-        case GL_RGB8:   internalformat = GL_RGBA8;   break;
-        case GL_RGB16F: internalformat = GL_RGBA16F;  break;
-        case GL_RGB32F: internalformat = GL_RGBA32F;  break;
-        case GL_SRGB8:  internalformat = GL_SRGB8_ALPHA8; break;
-        default: break;
+        case 0x8051: /* GL_RGB8 */    internalformat = 0x8058; /* GL_RGBA8 */ break;
+        case 0x881B: /* GL_RGB16F */  internalformat = 0x881A; /* GL_RGBA16F */ break;
+        case 0x8815: /* GL_RGB32F */  internalformat = 0x8814; /* GL_RGBA32F */ break;
+        case 0x8C41: /* GL_SRGB8 */   internalformat = 0x8C43; /* GL_SRGB8_ALPHA8 */ break;
+        case 0x8054: /* GL_RGB16 */  
+        case 0x8C3D: /* GL_RGB9_E5 */ internalformat = 0x881A; /* GL_RGBA16F */ break;
     }
+
+    if (orig_internal != internalformat) {
+        LOG_V("[MobileGlues-GL] INTERCEPT: glGetInternalformativ promoted 0x%04X to 0x%04X", orig_internal, internalformat);
+    }
+
     GLES.glGetInternalformativ(target, internalformat, pname, bufSize, params);
 }
+
 //NATIVE_FUNCTION_HEAD(void, glDispatchCompute, GLuint num_groups_x, GLuint num_groups_y, GLuint num_groups_z) NATIVE_FUNCTION_END_NO_RETURN(void, glDispatchCompute, num_groups_x,num_groups_y,num_groups_z)
 NATIVE_FUNCTION_HEAD(void, glDispatchComputeIndirect, GLintptr indirect) NATIVE_FUNCTION_END_NO_RETURN(void, glDispatchComputeIndirect, indirect)
 NATIVE_FUNCTION_HEAD(void, glDrawArraysIndirect, GLenum mode, const void *indirect) NATIVE_FUNCTION_END_NO_RETURN(void, glDrawArraysIndirect, mode,indirect)

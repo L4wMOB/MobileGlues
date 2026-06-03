@@ -258,21 +258,6 @@ TextureObject* mgGetTexObjectByID(unsigned texture) {
 void internal_convert(GLenum* internal_format, GLenum* type, GLenum* format) {
     if (format && *format == GL_BGRA) *format = GL_RGBA;
 
-    // Promote all non-alpha RGB formats to RGBA equivalents for Apple Metal.
-    GLenum orig_internal = *internal_format;
-    switch (*internal_format) {
-        case 0x8051: /* GL_RGB8 */    *internal_format = 0x8058; /* GL_RGBA8 */        if(format) *format = 0x1908; /* GL_RGBA */ break;
-        case 0x881B: /* GL_RGB16F */  *internal_format = 0x881A; /* GL_RGBA16F */      if(format) *format = 0x1908; break;
-        case 0x8815: /* GL_RGB32F */  *internal_format = 0x8814; /* GL_RGBA32F */      if(format) *format = 0x1908; break;
-        case 0x8C41: /* GL_SRGB8 */   *internal_format = 0x8C43; /* GL_SRGB8_ALPHA8 */ if(format) *format = 0x1908; break;
-        case 0x8054: /* GL_RGB16 */  
-        case 0x8C3D: /* GL_RGB9_E5 */ *internal_format = 0x881A; /* Fallback RGBA16F*/ if(format) *format = 0x1908; break;
-    }
-
-    if (orig_internal != *internal_format) {
-        LOG_V("[MobileGlues-Texture] CONVERT: Promoted RGB format 0x%04X to RGBA format 0x%04X", orig_internal, *internal_format);
-    }
-
     switch (*internal_format) {
     case GL_DEPTH_COMPONENT16:
         if (type) *type = GL_UNSIGNED_SHORT;
@@ -309,8 +294,20 @@ void internal_convert(GLenum* internal_format, GLenum* type, GLenum* format) {
     case GL_COMPRESSED_RG_RGTC2:
         LOG_E("GL_COMPRESSED_RED_RGTC1 or GL_COMPRESSED_RG_RGTC2 is not supported!");
         break;
+    case GL_SRGB8:
+        // Apple GPU: GL_SRGB8 (no alpha) not renderable; promote to GL_SRGB8_ALPHA8
+        *internal_format = GL_SRGB8_ALPHA8;
+        if (type) *type = GL_UNSIGNED_BYTE;
+        if (format) *format = GL_RGBA;
+        break;
     case GL_RGBA32F:
         if (type) *type = GL_FLOAT;
+        break;
+    case GL_RGB32F:
+        // Apple GPU: GL_RGB32F not renderable; promote to GL_RGBA32F
+        *internal_format = GL_RGBA32F;
+        if (type) *type = GL_FLOAT;
+        if (format) *format = GL_RGBA;
         break;
     case GL_RGB9_E5:
         if (type) *type = GL_UNSIGNED_INT_5_9_9_9_REV;
@@ -348,11 +345,19 @@ void internal_convert(GLenum* internal_format, GLenum* type, GLenum* format) {
         *internal_format = GL_R16F;
         if (type) *type = GL_FLOAT;
         break;
+    case GL_RGB16:
+    case GL_RGB16F:
+        // Apple GPU: GL_RGB16F not renderable; promote to GL_RGBA16F
+        *internal_format = GL_RGBA16F;
+        if (type) *type = GL_HALF_FLOAT;
+        if (format) *format = GL_RGBA;
+        break;
     case GL_RG16:
         *internal_format = GL_RG16F;
         if (type) *type = GL_HALF_FLOAT;
         if (format) *format = GL_RG;
         break;
+        // Inline R and RG channel mappings
     case GL_R8:
         if (format) *format = GL_RED;
         if (type) *type = GL_UNSIGNED_BYTE;
@@ -386,8 +391,8 @@ void internal_convert(GLenum* internal_format, GLenum* type, GLenum* format) {
                 break;
             default:
                 LOG_E("Unsupported type for GL_RED: %s", glEnumToString(*type));
-                if (type) *type = GL_UNSIGNED_BYTE;
-                *internal_format = GL_R8;           
+                if (type) *type = GL_UNSIGNED_BYTE; // Fallback to unsigned byte
+                *internal_format = GL_R8;           // Fallback to R8
                 if (format) *format = GL_RED;
                 break;
             }
@@ -465,7 +470,13 @@ void internal_convert(GLenum* internal_format, GLenum* type, GLenum* format) {
         if (format) *format = GL_RGBA;
         if (type) *type = GL_BYTE;
     default:
-        if (*internal_format == GL_RGBA16_SNORM) {
+        // fallback handling for GL_RGB8, GL_RGBA16_SNORM etc.
+        if (*internal_format == GL_RGB8) {
+            // Apple GPU: GL_RGB8 not renderable as FBO attachment; promote to GL_RGBA8
+            *internal_format = GL_RGBA8;
+            if (type && *type != GL_UNSIGNED_BYTE) *type = GL_UNSIGNED_BYTE;
+            if (format) *format = GL_RGBA;
+        } else if (*internal_format == GL_RGBA16_SNORM) {
             if (type && *type != GL_SHORT) *type = GL_SHORT;
         }
         break;

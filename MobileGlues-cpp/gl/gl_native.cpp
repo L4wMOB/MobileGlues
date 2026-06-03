@@ -53,11 +53,33 @@ NATIVE_FUNCTION_HEAD(void, glDepthFunc, GLenum func) NATIVE_FUNCTION_END_NO_RETU
 NATIVE_FUNCTION_HEAD(void, glDepthMask, GLboolean flag) NATIVE_FUNCTION_END_NO_RETURN(void, glDepthMask, flag)
 NATIVE_FUNCTION_HEAD(void, glDepthRangef, GLfloat n, GLfloat f) NATIVE_FUNCTION_END_NO_RETURN(void, glDepthRangef, n,f)
 NATIVE_FUNCTION_HEAD(void, glDetachShader, GLuint program, GLuint shader) NATIVE_FUNCTION_END_NO_RETURN(void, glDetachShader, program,shader)
-NATIVE_FUNCTION_HEAD(void, glDisable, GLenum cap) NATIVE_FUNCTION_END_NO_RETURN(void, glDisable, cap)
+NATIVE_FUNCTION_HEAD(void, glDisable, GLenum cap) {
+    // Filter GL 3.x caps unsupported by GLES (would generate GL_INVALID_ENUM and corrupt state)
+    switch (cap) {
+        case 0x8DB9: // GL_FRAMEBUFFER_SRGB
+        case 0x0BC0: // GL_ALPHA_TEST
+        case 0x0B10: // GL_COLOR_MATERIAL
+        case 0x0DE1: // GL_TEXTURE_2D (GLES always on)
+            return;
+        default: break;
+    }
+    GLES.glDisable(cap);
+}
 NATIVE_FUNCTION_HEAD(void, glDisableVertexAttribArray, GLuint index) NATIVE_FUNCTION_END_NO_RETURN(void, glDisableVertexAttribArray, index)
 NATIVE_FUNCTION_HEAD(void, glDrawArrays, GLenum mode, GLint first, GLsizei count) NATIVE_FUNCTION_END_NO_RETURN(void, glDrawArrays, mode,first,count)
 //NATIVE_FUNCTION_HEAD(void, glDrawElements, GLenum mode, GLsizei count, GLenum type, const void *indices) NATIVE_FUNCTION_END_NO_RETURN(void, glDrawElements, mode,count,type,indices)
-NATIVE_FUNCTION_HEAD(void, glEnable, GLenum cap) NATIVE_FUNCTION_END_NO_RETURN(void, glEnable, cap)
+NATIVE_FUNCTION_HEAD(void, glEnable, GLenum cap) {
+    // Filter GL 3.x caps unsupported by GLES (would generate GL_INVALID_ENUM and corrupt state)
+    switch (cap) {
+        case 0x8DB9: // GL_FRAMEBUFFER_SRGB
+        case 0x0BC0: // GL_ALPHA_TEST
+        case 0x0B10: // GL_COLOR_MATERIAL
+        case 0x0DE1: // GL_TEXTURE_2D (GLES always on)
+            return;
+        default: break;
+    }
+    GLES.glEnable(cap);
+}
 NATIVE_FUNCTION_HEAD(void, glEnableVertexAttribArray, GLuint index) NATIVE_FUNCTION_END_NO_RETURN(void, glEnableVertexAttribArray, index)
 NATIVE_FUNCTION_HEAD(void, glFinish) NATIVE_FUNCTION_END_NO_RETURN(void, glFinish)
 NATIVE_FUNCTION_HEAD(void, glFlush) NATIVE_FUNCTION_END_NO_RETURN(void, glFlush)
@@ -260,25 +282,16 @@ NATIVE_FUNCTION_HEAD(void, glInvalidateFramebuffer, GLenum target, GLsizei numAt
 NATIVE_FUNCTION_HEAD(void, glInvalidateSubFramebuffer, GLenum target, GLsizei numAttachments, const GLenum *attachments, GLint x, GLint y, GLsizei width, GLsizei height) NATIVE_FUNCTION_END_NO_RETURN(void, glInvalidateSubFramebuffer, target,numAttachments,attachments,x,y,width,height)
 //NATIVE_FUNCTION_HEAD(void, glTexStorage2D, GLenum target, GLsizei levels, GLenum internalformat, GLsizei width, GLsizei height) NATIVE_FUNCTION_END_NO_RETURN(void, glTexStorage2D, target,levels,internalformat,width,height)
 //NATIVE_FUNCTION_HEAD(void, glTexStorage3D, GLenum target, GLsizei levels, GLenum internalformat, GLsizei width, GLsizei height, GLsizei depth) NATIVE_FUNCTION_END_NO_RETURN(void, glTexStorage3D, target,levels,internalformat,width,height,depth)
-NATIVE_FUNCTION_HEAD(void, glGetInternalformativ, GLenum target, GLenum internalformat, GLenum pname, GLsizei bufSize, GLint *params)
-    // Mirror the texture promotions so Sodium doesn't fail format support queries
-    GLenum orig_internal = internalformat;
+NATIVE_FUNCTION_HEAD(void, glGetInternalformativ, GLenum target, GLenum internalformat, GLenum pname, GLsizei bufSize, GLint *params) {
     switch (internalformat) {
-        case 0x8051: /* GL_RGB8 */    internalformat = 0x8058; /* GL_RGBA8 */ break;
-        case 0x881B: /* GL_RGB16F */  internalformat = 0x881A; /* GL_RGBA16F */ break;
-        case 0x8815: /* GL_RGB32F */  internalformat = 0x8814; /* GL_RGBA32F */ break;
-        case 0x8C41: /* GL_SRGB8 */   internalformat = 0x8C43; /* GL_SRGB8_ALPHA8 */ break;
-        case 0x8054: /* GL_RGB16 */  
-        case 0x8C3D: /* GL_RGB9_E5 */ internalformat = 0x881A; /* GL_RGBA16F */ break;
+        case GL_RGB8:   internalformat = GL_RGBA8;        break;
+        case GL_RGB16F: internalformat = GL_RGBA16F;      break;
+        case GL_RGB32F: internalformat = GL_RGBA32F;      break;
+        case 0x8C41:    internalformat = 0x8C43; break; // GL_SRGB8 -> GL_SRGB8_ALPHA8
+        default: break;
     }
-
-    if (orig_internal != internalformat) {
-        LOG_V("[MobileGlues-GL] INTERCEPT: glGetInternalformativ promoted 0x%04X to 0x%04X", orig_internal, internalformat);
-    }
-
     GLES.glGetInternalformativ(target, internalformat, pname, bufSize, params);
 }
-
 //NATIVE_FUNCTION_HEAD(void, glDispatchCompute, GLuint num_groups_x, GLuint num_groups_y, GLuint num_groups_z) NATIVE_FUNCTION_END_NO_RETURN(void, glDispatchCompute, num_groups_x,num_groups_y,num_groups_z)
 NATIVE_FUNCTION_HEAD(void, glDispatchComputeIndirect, GLintptr indirect) NATIVE_FUNCTION_END_NO_RETURN(void, glDispatchComputeIndirect, indirect)
 NATIVE_FUNCTION_HEAD(void, glDrawArraysIndirect, GLenum mode, const void *indirect) NATIVE_FUNCTION_END_NO_RETURN(void, glDrawArraysIndirect, mode,indirect)

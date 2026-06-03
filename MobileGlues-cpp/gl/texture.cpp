@@ -25,7 +25,7 @@
 #include <GL/gl.h>
 #include <ankerl/unordered_dense.h>
 
-#define DEBUG 0
+#define DEBUG 1
 
 int nlevel(int size, int level) {
     if (size) {

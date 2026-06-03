@@ -13,7 +13,7 @@
 #include "mg.h"
 #include <GLES3/gl32.h>
 
-#define DEBUG 1
+#define DEBUG 0
 
 //NATIVE_FUNCTION_HEAD(void, glActiveTexture, GLenum texture) NATIVE_FUNCTION_END_NO_RETURN(void, glActiveTexture, texture)
 //NATIVE_FUNCTION_HEAD(void, glAttachShader, GLuint program, GLuint shader) NATIVE_FUNCTION_END_NO_RETURN(void, glAttachShader, program,shader)
@@ -67,7 +67,7 @@ NATIVE_FUNCTION_HEAD(void, glDisable, GLenum cap)
 }
 NATIVE_FUNCTION_HEAD(void, glDisableVertexAttribArray, GLuint index) NATIVE_FUNCTION_END_NO_RETURN(void, glDisableVertexAttribArray, index)
 NATIVE_FUNCTION_HEAD(void, glDrawArrays, GLenum mode, GLint first, GLsizei count)
-    LOG_D("Use native function: %s @ glDrawArrays(...)", RENDERERNAME);
+    LOG_E("Use native function: %s @ glDrawArrays(...)", RENDERERNAME);
 #if 1
     // DEBUG: dump critical GL state to diagnose GUI transparency
     GLint fbo = 0, prog = 0, vao = 0;
@@ -84,20 +84,20 @@ NATIVE_FUNCTION_HEAD(void, glDrawArrays, GLenum mode, GLint first, GLsizei count
     GLES.glGetIntegerv(GL_BLEND_DST_RGB,   &blend_dst);
     GLES.glGetIntegerv(GL_BLEND_EQUATION,  &blend_eq);
     GLES.glGetBooleanv(GL_COLOR_WRITEMASK, cmask);
-    LOG_D("[MG-DEBUG-DrawArrays] mode=%d first=%d count=%d | fbo=%d prog=%d vao=%d",
+    LOG_E("[MG-DEBUG-DrawArrays] mode=%d first=%d count=%d | fbo=%d prog=%d vao=%d",
           mode, first, count, fbo, prog, vao);
-    LOG_D("[MG-DEBUG-DrawArrays] blend=%d(src=0x%x dst=0x%x eq=0x%x) depth=%d cull=%d colormask=%d%d%d%d",
+    LOG_E("[MG-DEBUG-DrawArrays] blend=%d(src=0x%x dst=0x%x eq=0x%x) depth=%d cull=%d colormask=%d%d%d%d",
           blend, blend_src, blend_dst, blend_eq, depth, cull,
           cmask[0], cmask[1], cmask[2], cmask[3]);
     // Check active texture unit and bound texture
     GLint active_tex = 0, bound_tex = 0;
     GLES.glGetIntegerv(GL_ACTIVE_TEXTURE, &active_tex);
     GLES.glGetIntegerv(GL_TEXTURE_BINDING_2D, &bound_tex);
-    LOG_D("[MG-DEBUG-DrawArrays] active_tex=0x%x bound_tex2d=%d", active_tex, bound_tex);
+    LOG_E("[MG-DEBUG-DrawArrays] active_tex=0x%x bound_tex2d=%d", active_tex, bound_tex);
     // Check FBO completeness
     if (fbo != 0) {
         GLenum status = GLES.glCheckFramebufferStatus(GL_FRAMEBUFFER);
-        LOG_D("[MG-DEBUG-DrawArrays] FBO status=0x%x (%s)", status,
+        LOG_E("[MG-DEBUG-DrawArrays] FBO status=0x%x (%s)", status,
               status == GL_FRAMEBUFFER_COMPLETE ? "COMPLETE" : "INCOMPLETE");
     }
 #endif

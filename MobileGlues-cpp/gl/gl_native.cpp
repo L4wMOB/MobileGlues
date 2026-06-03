@@ -13,7 +13,7 @@
 #include "mg.h"
 #include <GLES3/gl32.h>
 
-#define DEBUG 0
+#define DEBUG 1
 
 //NATIVE_FUNCTION_HEAD(void, glActiveTexture, GLenum texture) NATIVE_FUNCTION_END_NO_RETURN(void, glActiveTexture, texture)
 //NATIVE_FUNCTION_HEAD(void, glAttachShader, GLuint program, GLuint shader) NATIVE_FUNCTION_END_NO_RETURN(void, glAttachShader, program,shader)

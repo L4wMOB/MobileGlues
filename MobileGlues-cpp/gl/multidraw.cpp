@@ -95,7 +95,7 @@ void prepare_indirect_buffer(const GLsizei* counts, GLenum type, const void* con
     if (g_cmdbufsize < primcount) {
         size_t sz = g_cmdbufsize;
 
-        LOG_D("Before resize: %d", sz)
+        LOG_E("Before resize: %d", sz)
 
         // 2-exponential to reduce reallocation
         while (sz < primcount)
@@ -106,7 +106,7 @@ void prepare_indirect_buffer(const GLsizei* counts, GLenum type, const void* con
         g_cmdbufsize = sz;
     }
 
-    LOG_D("After resize: %d", g_cmdbufsize)
+    LOG_E("After resize: %d", g_cmdbufsize)
 
     auto* pcmds = (draw_elements_indirect_command_t*)GLES.glMapBufferRange(
         GL_DRAW_INDIRECT_BUFFER, 0, primcount * sizeof(draw_elements_indirect_command_t),
@@ -275,7 +275,7 @@ void mg_glMultiDrawElementsBaseVertex_basevertex(GLenum mode, GLsizei* counts, G
     for (GLsizei i = 0; i < primcount; ++i) {
         const GLsizei count = counts[i];
         if (count > 0) {
-            LOG_D("GLES.glDrawElementsBaseVertex, mode = %s, count = %d, type = %s, indices[i] = 0x%x, basevertex[i] = "
+            LOG_E("GLES.glDrawElementsBaseVertex, mode = %s, count = %d, type = %s, indices[i] = 0x%x, basevertex[i] = "
                   "%d",
                   glEnumToString(mode), count, glEnumToString(type), indices[i], basevertex[i])
             GLES.glDrawElementsBaseVertex(mode, count, type, indices[i], basevertex[i]);
@@ -516,7 +516,7 @@ GLAPI GLAPIENTRY void mg_glMultiDrawElementsBaseVertex_compute(GLenum mode, GLsi
         return;
     }
     if (is_strip_like_mode(mode)) {
-        LOG_D("mg_glMultiDrawElementsBaseVertex_compute: strip/loop mode, fallback")
+        LOG_E("mg_glMultiDrawElementsBaseVertex_compute: strip/loop mode, fallback")
         mg_glMultiDrawElementsBaseVertex_drawelements(mode, counts, type, indices, primcount, basevertex);
         return;
     }
@@ -544,7 +544,7 @@ GLAPI GLAPIENTRY void mg_glMultiDrawElementsBaseVertex_compute(GLenum mode, GLsi
 
     // Init compute buffers
     if (!g_compute_inited) {
-        LOG_D("Initializing multidraw compute pipeline...")
+        LOG_E("Initializing multidraw compute pipeline...")
         GLES.glGenBuffers(1, &g_prefixsumbuffer);
         GLES.glGenBuffers(1, &g_firstidx_ssbo);
         GLES.glGenBuffers(1, &g_basevtx_ssbo);
@@ -572,7 +572,7 @@ GLAPI GLAPIENTRY void mg_glMultiDrawElementsBaseVertex_compute(GLenum mode, GLsi
     GLES.glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &ibo);
     CHECK_GL_ERROR_NO_INIT
     if (ibo == 0) {
-        LOG_D("mg_glMultiDrawElementsBaseVertex_compute: no element array buffer bound, fallback")
+        LOG_E("mg_glMultiDrawElementsBaseVertex_compute: no element array buffer bound, fallback")
         mg_glMultiDrawElementsBaseVertex_drawelements(mode, counts, type, indices, primcount, basevertex);
         return;
     }
@@ -706,24 +706,24 @@ GLAPI GLAPIENTRY void mg_glMultiDrawElementsBaseVertex_compute(GLenum mode, GLsi
     CHECK_GL_ERROR_NO_INIT
 
     // Dispatch compute
-    LOG_D("Using compute program = %d", g_compute_program)
+    LOG_E("Using compute program = %d", g_compute_program)
     GLES.glUseProgram(g_compute_program);
     CHECK_GL_ERROR_NO_INIT
     if (g_element_size_loc >= 0) {
         GLES.glUniform1ui(g_element_size_loc, elementSize);
         CHECK_GL_ERROR_NO_INIT
     }
-    LOG_D("Dispatch compute")
+    LOG_E("Dispatch compute")
     GLES.glDispatchCompute((total_indices + 63) / 64, 1, 1);
     CHECK_GL_ERROR_NO_INIT
 
     // Wait for compute to complete
-    LOG_D("memory barrier")
+    LOG_E("memory barrier")
     GLES.glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_ELEMENT_ARRAY_BARRIER_BIT);
     CHECK_GL_ERROR_NO_INIT
 
     // Bind index buffer and do draw
-    LOG_D("draw")
+    LOG_E("draw")
     glUseProgram(prev_program); // use layer to track current_program state
     CHECK_GL_ERROR_NO_INIT
     GLES.glBindBuffer(GL_ARRAY_BUFFER, prev_vb);

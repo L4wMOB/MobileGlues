@@ -6,6 +6,10 @@
 // End of Source File Header
 
 #include "multidraw.h"
+
+// Forward declarations for MobileGlues layer functions (maintain VAO/IBO tracking)
+void glBindBuffer(GLenum target, GLuint buffer);
+void glUseProgram(GLuint program);
 #include "../config/settings.h"
 #include <cstdint>
 #include <limits>
@@ -221,7 +225,7 @@ void mg_glMultiDrawElementsBaseVertex_drawelements(GLenum mode, GLsizei* counts,
         GLES.glDeleteBuffers(1, &tempBuffer);
     }
 
-    GLES.glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, prevElementBuffer);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, prevElementBuffer);
 
     CHECK_GL_ERROR
 }
@@ -720,11 +724,12 @@ GLAPI GLAPIENTRY void mg_glMultiDrawElementsBaseVertex_compute(GLenum mode, GLsi
 
     // Bind index buffer and do draw
     LOG_D("draw")
-    GLES.glUseProgram(prev_program);
+    glUseProgram(prev_program); // use layer to track current_program state
     CHECK_GL_ERROR_NO_INIT
     GLES.glBindBuffer(GL_ARRAY_BUFFER, prev_vb);
     CHECK_GL_ERROR_NO_INIT
-    GLES.glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, g_outputibo);
+    // Use layer glBindBuffer so VAO->IBO tracking stays consistent
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, g_outputibo);
     CHECK_GL_ERROR_NO_INIT
     GLES.glDrawElements(mode, total_indices, GL_UNSIGNED_INT, 0);
 
@@ -735,6 +740,7 @@ GLAPI GLAPIENTRY void mg_glMultiDrawElementsBaseVertex_compute(GLenum mode, GLsi
     }
     GLES.glBindBuffer(GL_SHADER_STORAGE_BUFFER, prev_ssbo_binding);
     CHECK_GL_ERROR_NO_INIT
-    GLES.glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
+    // Restore original IBO via layer so VAO->IBO tracking is updated correctly
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
     CHECK_GL_ERROR_NO_INIT
 }

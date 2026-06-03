@@ -66,7 +66,7 @@ NATIVE_FUNCTION_HEAD(void, glDisable, GLenum cap)
     GLES.glDisable(cap);
 }
 NATIVE_FUNCTION_HEAD(void, glDisableVertexAttribArray, GLuint index) NATIVE_FUNCTION_END_NO_RETURN(void, glDisableVertexAttribArray, index)
-NATIVE_FUNCTION_HEAD(void, glDrawArrays, GLenum mode, GLint first, GLsizei count) {
+NATIVE_FUNCTION_HEAD(void, glDrawArrays, GLenum mode, GLint first, GLsizei count)
     LOG_D("Use native function: %s @ glDrawArrays(...)", RENDERERNAME);
 #if 1
     // DEBUG: dump critical GL state to diagnose GUI transparency

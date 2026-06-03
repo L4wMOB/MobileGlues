@@ -472,9 +472,13 @@ void internal_convert(GLenum* internal_format, GLenum* type, GLenum* format) {
     default:
         // fallback handling for GL_RGB8, GL_RGBA16_SNORM etc.
         if (*internal_format == GL_RGB8) {
-            // Apple GPU: GL_RGB8 not renderable as FBO attachment; promote to GL_RGBA8
+            // Apple GPU: GL_RGB8 not renderable as FBO attachment; promote to GL_RGBA8.
+            // DO NOT change transfer format here — glTexImage2D will handle RGB->RGBA
+            // pixel repack if needed. For FBO/storage paths, format==nullptr so safe.
             *internal_format = GL_RGBA8;
             if (type && *type != GL_UNSIGNED_BYTE) *type = GL_UNSIGNED_BYTE;
+            // Only change format if caller explicitly passes format pointer AND
+            // no pixel data will be used (storage-only path passes format=nullptr)
             if (format) *format = GL_RGBA;
         } else if (*internal_format == GL_RGBA16_SNORM) {
             if (type && *type != GL_SHORT) *type = GL_SHORT;
@@ -607,7 +611,25 @@ void glTexImage2D(GLenum target, GLint level, GLint internalFormat, GLsizei widt
 
     tex->format = format;
 
-    GLES.glTexImage2D(target, level, internalFormat, width, height, border, format, type, pixels);
+    // If we promoted GL_RGB8->GL_RGBA8 but the original transfer format was GL_RGB,
+    // we must repack pixels from 3-byte RGB to 4-byte RGBA (alpha=255) so GLES gets
+    // correct data. Without this, GLES reads 4 bytes per pixel from 3-byte data =
+    // corrupted colors and wrong alpha on all GUI/atlas textures.
+    if (internalFormat == GL_RGBA8 && format == GL_RGBA && transfer_format == GL_RGB
+        && type == GL_UNSIGNED_BYTE && pixels != nullptr && width > 0 && height > 0) {
+        LOG_D("[MG-DEBUG] RGB->RGBA repack for tex %dx%d", width, height);
+        size_t pixel_count = (size_t)width * height;
+        std::vector<uint8_t> rgba_pixels(pixel_count * 4);
+        const uint8_t* src = reinterpret_cast<const uint8_t*>(pixels);
+        uint8_t* dst = rgba_pixels.data();
+        for (size_t i = 0; i < pixel_count; ++i) {
+            dst[0] = src[0]; dst[1] = src[1]; dst[2] = src[2]; dst[3] = 0xFF;
+            src += 3; dst += 4;
+        }
+        GLES.glTexImage2D(target, level, internalFormat, width, height, border, GL_RGBA, type, rgba_pixels.data());
+    } else {
+        GLES.glTexImage2D(target, level, internalFormat, width, height, border, format, type, pixels);
+    }
 
     CHECK_GL_ERROR
 }

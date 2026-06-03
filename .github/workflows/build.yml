@@ -1,5 +1,10 @@
 name: Build MobileGlues for iOS
 on: [push, workflow_dispatch]
+
+permissions:
+  actions: write
+  contents: read
+
 jobs:
   build-ios:
     runs-on: macos-latest
@@ -26,4 +31,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: MobileGlues-iOS-dylib
-          path: /Users/runner/work/MobileGlues/MobileGlues/MobileGlues-cpp/build
+          path: MobileGlues-cpp/build/libmobileglues.dylib
+          retention-days: 1
+
+      - name: Delete old workflow runs
+        uses: Mattraks/delete-workflow-runs@v2
+        with:
+          token: ${{ github.token }}
+          repository: ${{ github.repository }} 
+          retain_days: 0
+          keep_minimum_runs: 1

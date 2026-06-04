@@ -223,7 +223,7 @@ TextureUnit& GetTextureUnit(int unit) {
 
 void MarkTextureObjectForDeletion(unsigned texture) {
     if (texture >= BufferObjectsVec.size() || !BufferObjectsVec[texture]) {
-        LOG_E("Texture %u not found in BufferObjectsVec!", texture);
+        LOG_D("Texture %u not found in BufferObjectsVec!", texture);
         return;
     }
 
@@ -273,7 +273,7 @@ void internal_convert(GLenum* internal_format, GLenum* type, GLenum* format) {
         if (type) *type = GL_FLOAT;
         break;
     case GL_DEPTH_COMPONENT:
-        LOG_E("Find GL_DEPTH_COMPONENT: internalFormat: %s, format: %s, type: %s", glEnumToString(*internal_format),
+        LOG_D("Find GL_DEPTH_COMPONENT: internalFormat: %s, format: %s, type: %s", glEnumToString(*internal_format),
               glEnumToString(*format), glEnumToString(*type));
         if (type) {
             *internal_format = GL_DEPTH_COMPONENT;
@@ -550,13 +550,13 @@ void glTexImage2D(GLenum target, GLint level, GLint internalFormat, GLsizei widt
     LOG()
     GLenum transfer_format = format;
 
-    LOG_E("mg_glTexImage2D,target: %s,level: %d,internalFormat: %s->%s,width: "
+    LOG_D("mg_glTexImage2D,target: %s,level: %d,internalFormat: %s->%s,width: "
           "%d,height: %d,border: %d,format: %s,type: %s, pixels: 0x%x",
           glEnumToString(target), level, glEnumToString(internalFormat), glEnumToString(internalFormat), width, height,
           border, glEnumToString(format), glEnumToString(type), pixels)
     internal_convert(reinterpret_cast<GLenum*>(&internalFormat), &type, &format);
 
-    LOG_E("GLES.glTexImage2D,target: %s,level: %d,internalFormat: %s->%s,width: "
+    LOG_D("GLES.glTexImage2D,target: %s,level: %d,internalFormat: %s->%s,width: "
           "%d,height: %d,border: %d,format: %s,type: %s, pixels: 0x%x",
           glEnumToString(target), level, glEnumToString(internalFormat), glEnumToString(internalFormat), width, height,
           border, glEnumToString(format), glEnumToString(type), pixels)
@@ -583,7 +583,7 @@ void glTexImage2D(GLenum target, GLint level, GLint internalFormat, GLsizei widt
 
     if (transfer_format == GL_BGRA && tex->format != transfer_format && internalFormat == GL_RGBA8 && width <= 128 &&
         height <= 128) { // xaero has 64x64 tiles...hack here
-        LOG_E("Detected GL_BGRA format @ tex = %d, do swizzle", tex->texture)
+        LOG_D("Detected GL_BGRA format @ tex = %d, do swizzle", tex->texture)
         if (tex->swizzle_param[0] == 0) { // assert this as never called glTexParameteri(...,
                                           // GL_TEXTURE_SWIZZLE_R, ...)
             tex->swizzle_param[0] = GL_RED;
@@ -617,7 +617,7 @@ void glTexImage2D(GLenum target, GLint level, GLint internalFormat, GLsizei widt
     // corrupted colors and wrong alpha on all GUI/atlas textures.
     if (internalFormat == GL_RGBA8 && format == GL_RGBA && transfer_format == GL_RGB
         && type == GL_UNSIGNED_BYTE && pixels != nullptr && width > 0 && height > 0) {
-        LOG_E("[MG-DEBUG] RGB->RGBA repack for tex %dx%d", width, height);
+        LOG_D("[MG-DEBUG] RGB->RGBA repack for tex %dx%d", width, height);
         size_t pixel_count = (size_t)width * height;
         std::vector<uint8_t> rgba_pixels(pixel_count * 4);
         const uint8_t* src = reinterpret_cast<const uint8_t*>(pixels);
@@ -637,7 +637,7 @@ void glTexImage2D(GLenum target, GLint level, GLint internalFormat, GLsizei widt
 void glTexImage3D(GLenum target, GLint level, GLint internalFormat, GLsizei width, GLsizei height, GLsizei depth,
                   GLint border, GLenum format, GLenum type, const GLvoid* pixels) {
     LOG()
-    LOG_E("glTexImage3D, target: 0x%x, level: %d, internalFormat: 0x%x, width: "
+    LOG_D("glTexImage3D, target: 0x%x, level: %d, internalFormat: 0x%x, width: "
           "0x%x, height: %d, depth: %d, border: %d, format: 0x%x, type: %d",
           target, level, internalFormat, width, height, depth, border, format, type)
 
@@ -671,8 +671,8 @@ void glTexImage3D(GLenum target, GLint level, GLint internalFormat, GLsizei widt
 
 void glTexStorage1D(GLenum target, GLsizei levels, GLenum internalFormat, GLsizei width) {
     LOG()
-    LOG_E("glTexStorage1D not implemented!")
-    LOG_E("glTexStorage1D, target: %d, levels: %d, internalFormat: %d, width: %d", target, levels, internalFormat,
+    LOG_D("glTexStorage1D not implemented!")
+    LOG_D("glTexStorage1D, target: %d, levels: %d, internalFormat: %d, width: %d", target, levels, internalFormat,
           width)
     internal_convert(&internalFormat, nullptr, nullptr);
 
@@ -692,7 +692,7 @@ void glTexStorage1D(GLenum target, GLsizei levels, GLenum internalFormat, GLsize
 
 void glTexStorage2D(GLenum target, GLsizei levels, GLenum internalFormat, GLsizei width, GLsizei height) {
     LOG()
-    LOG_E("glTexStorage2D, target: %d, levels: %d, internalFormat: %d, width: "
+    LOG_D("glTexStorage2D, target: %d, levels: %d, internalFormat: %d, width: "
           "%d, height: %d",
           target, levels, internalFormat, width, height)
 
@@ -717,7 +717,7 @@ void glTexStorage2D(GLenum target, GLsizei levels, GLenum internalFormat, GLsize
 void glTexStorage3D(GLenum target, GLsizei levels, GLenum internalFormat, GLsizei width, GLsizei height,
                     GLsizei depth) {
     LOG()
-    LOG_E("glTexStorage3D, target: %d, levels: %d, internalFormat: %d, width: "
+    LOG_D("glTexStorage3D, target: %d, levels: %d, internalFormat: %d, width: "
           "%d, height: %d, depth: %d",
           target, levels, internalFormat, width, height, depth)
 
@@ -742,8 +742,8 @@ void glTexStorage3D(GLenum target, GLsizei levels, GLenum internalFormat, GLsize
 void glCopyTexImage1D(GLenum target, GLint level, GLenum internalFormat, GLint x, GLint y, GLsizei width,
                       GLint border) {
     LOG()
-    LOG_E("glCopyTexImage1D not implemented!")
-    LOG_E("glCopyTexImage1D, target: %d, level: %d, internalFormat: %d, x: %d, "
+    LOG_D("glCopyTexImage1D not implemented!")
+    LOG_D("glCopyTexImage1D, target: %d, level: %d, internalFormat: %d, x: %d, "
           "y: %d, width: %d, border: %d",
           target, level, internalFormat, x, y, width, border)
 
@@ -799,7 +799,7 @@ void glCopyTexImage2D(GLenum target, GLint level, GLenum internalFormat, GLint x
     GLES.glGetTexLevelParameteriv(target, level, GL_TEXTURE_INTERNAL_FORMAT, &realInternalFormat);
     internalFormat = (GLenum)realInternalFormat;
 
-    LOG_E("glCopyTexImage2D, target: %d, level: %d, internalFormat: %d, x: %d, "
+    LOG_D("glCopyTexImage2D, target: %d, level: %d, internalFormat: %d, x: %d, "
           "y: %d, width: %d, height: %d, border: %d",
           target, level, internalFormat, x, y, width, height, border)
 
@@ -865,7 +865,7 @@ void glCopyTexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffse
     GLint internalFormat;
     GLES.glGetTexLevelParameteriv(target, level, GL_TEXTURE_INTERNAL_FORMAT, &internalFormat);
 
-    LOG_E("glCopyTexSubImage2D, target: %s, level: %d, xoffset: %d, yoffset: %d, "
+    LOG_D("glCopyTexSubImage2D, target: %s, level: %d, xoffset: %d, yoffset: %d, "
           "x: %d, y: %d, width: %d, height: %d",
           glEnumToString(target), level, xoffset, yoffset, x, y, width, height)
 
@@ -905,7 +905,7 @@ void glRenderbufferStorage(GLenum target, GLenum internalFormat, GLsizei width, 
 
     INIT_CHECK_GL_ERROR_FORCE
 
-    LOG_E("glRenderbufferStorage, target: %s, internalFormat: %s, width: %d, "
+    LOG_D("glRenderbufferStorage, target: %s, internalFormat: %s, width: %d, "
           "height: %d",
           glEnumToString(target), glEnumToString(internalFormat), width, height)
 
@@ -920,7 +920,7 @@ void glRenderbufferStorageMultisample(GLenum target, GLsizei samples, GLenum int
 
     INIT_CHECK_GL_ERROR_FORCE
 
-    LOG_E("glRenderbufferStorageMultisample, target: %d, samples: %d, "
+    LOG_D("glRenderbufferStorageMultisample, target: %d, samples: %d, "
           "internalFormat: %d, width: %d, height: %d",
           target, samples, internalFormat, width, height)
 
@@ -931,7 +931,7 @@ void glRenderbufferStorageMultisample(GLenum target, GLsizei samples, GLenum int
 
 void glGetTexLevelParameterfv(GLenum target, GLint level, GLenum pname, GLfloat* params) {
     LOG()
-    LOG_E("glGetTexLevelParameterfv,target: %d, level: %d, pname: %d", target, level, pname)
+    LOG_D("glGetTexLevelParameterfv,target: %d, level: %d, pname: %d", target, level, pname)
     if (gl_state) {
         GLenum rtarget = map_tex_target(target);
         if (rtarget == GL_PROXY_TEXTURE_2D) {
@@ -966,7 +966,7 @@ void glGetTexLevelParameterfv(GLenum target, GLint level, GLenum pname, GLfloat*
 
 void glGetTexLevelParameteriv(GLenum target, GLint level, GLenum pname, GLint* params) {
     LOG()
-    LOG_E("glGetTexLevelParameteriv,target: %s, level: %d, pname: %s", glEnumToString(target), level,
+    LOG_D("glGetTexLevelParameteriv,target: %s, level: %d, pname: %s", glEnumToString(target), level,
           glEnumToString(pname))
     if (gl_state) {
         GLenum rtarget = map_tex_target(target);
@@ -997,7 +997,7 @@ void glGetTexLevelParameteriv(GLenum target, GLint level, GLenum pname, GLint* p
     if (pname == GL_TEXTURE_INTERNAL_FORMAT) {
         TextureObject* tex = mgGetTexObjectByTarget(target);
         if (tex && tex->internal_format != 0) {
-            LOG_E("glGetTexLevelParameteriv: returning tracked internal_format 0x%x for target %s",
+            LOG_D("glGetTexLevelParameteriv: returning tracked internal_format 0x%x for target %s",
                   tex->internal_format, glEnumToString(target))
             (*params) = (GLint)tex->internal_format;
             return;
@@ -1005,12 +1005,12 @@ void glGetTexLevelParameteriv(GLenum target, GLint level, GLenum pname, GLint* p
         // Texture has no tracked format yet (newly generated, no storage allocated).
         // Desktop GL returns GL_RGBA as the default internal format for uninitialized
         // textures. Return the same to prevent callers from receiving 0.
-        LOG_E("glGetTexLevelParameteriv: no tracked internal_format for target %s, defaulting to GL_RGBA",
+        LOG_D("glGetTexLevelParameteriv: no tracked internal_format for target %s, defaulting to GL_RGBA",
               glEnumToString(target))
         (*params) = GL_RGBA;
         return;
     }
-    LOG_E("es.glGetTexLevelParameteriv,target: %s, level: %d, pname: %s", glEnumToString(target), level,
+    LOG_D("es.glGetTexLevelParameteriv,target: %s, level: %d, pname: %s", glEnumToString(target), level,
           glEnumToString(pname))
     GLES.glGetTexLevelParameteriv(target, level, pname, params);
     CHECK_GL_ERROR
@@ -1018,10 +1018,10 @@ void glGetTexLevelParameteriv(GLenum target, GLint level, GLenum pname, GLint* p
 
 void glTexParameteriv(GLenum target, GLenum pname, const GLint* params) {
     LOG()
-    LOG_E("glTexParameteriv, target: %s, pname: %s", glEnumToString(target), glEnumToString(pname))
+    LOG_D("glTexParameteriv, target: %s, pname: %s", glEnumToString(target), glEnumToString(pname))
 
     if (pname == GL_TEXTURE_SWIZZLE_RGBA) {
-        LOG_E("find GL_TEXTURE_SWIZZLE_RGBA, now use glTexParameteri")
+        LOG_D("find GL_TEXTURE_SWIZZLE_RGBA, now use glTexParameteri")
         if (params) {
             // deferred those call to draw call?
             GLES.glTexParameteri(target, GL_TEXTURE_SWIZZLE_R, params[0]);
@@ -1049,7 +1049,7 @@ void glTexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, G
                      GLenum format, GLenum type, const void* pixels) {
     LOG()
 
-    LOG_E("glTexSubImage2D, target = %s, level = %d, xoffset = %d, yoffset = %d, "
+    LOG_D("glTexSubImage2D, target = %s, level = %d, xoffset = %d, yoffset = %d, "
           "width = %d, height = %d, format = %s, type = %s, pixels = 0x%x",
           glEnumToString(target), level, xoffset, yoffset, width, height, glEnumToString(format), glEnumToString(type),
           pixels)
@@ -1062,6 +1062,29 @@ void glTexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, G
         type = GL_UNSIGNED_BYTE;
     }
 
+    // If this texture was promoted GL_RGB8->GL_RGBA8 (by internal_convert), but the
+    // upload still uses format=GL_RGB, GLES will reject the call (format mismatch).
+    // Detect this: if bound texture internal format is GL_RGBA8 and upload is GL_RGB
+    // UNSIGNED_BYTE, repack pixels RGB->RGBA with alpha=255.
+    if (format == GL_RGB && type == GL_UNSIGNED_BYTE && pixels != nullptr && width > 0 && height > 0) {
+        GET_TEXTURE_OBJECT(target);
+        if (tex && tex->internal_format == GL_RGBA8) {
+            LOG_V("[MG-DEBUG] glTexSubImage2D RGB->RGBA repack tex=%d off=%d,%d size=%dx%d",
+                  tex->texture, xoffset, yoffset, width, height);
+            size_t pixel_count = (size_t)width * height;
+            std::vector<uint8_t> rgba_buf(pixel_count * 4);
+            const uint8_t* src = reinterpret_cast<const uint8_t*>(pixels);
+            uint8_t* dst = rgba_buf.data();
+            for (size_t i = 0; i < pixel_count; ++i) {
+                dst[0] = src[0]; dst[1] = src[1]; dst[2] = src[2]; dst[3] = 0xFF;
+                src += 3; dst += 4;
+            }
+            GLES.glTexSubImage2D(target, level, xoffset, yoffset, width, height, GL_RGBA, type, rgba_buf.data());
+            CHECK_GL_ERROR
+            return;
+        }
+    }
+
     GLES.glTexSubImage2D(target, level, xoffset, yoffset, width, height, format, type, pixels);
 
     CHECK_GL_ERROR
@@ -1069,7 +1092,7 @@ void glTexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, G
 
 void glBindTexture(GLenum target, GLuint texture) {
     LOG()
-    LOG_E("glBindTexture(%s, %d)", glEnumToString(target), texture)
+    LOG_D("glBindTexture(%s, %d)", glEnumToString(target), texture)
     INIT_CHECK_GL_ERROR
 
     if (hardware && gl_state && hardware->emulate_texture_buffer && target == GL_TEXTURE_BUFFER) {
@@ -1091,7 +1114,7 @@ void glBindTexture(GLenum target, GLuint texture) {
     auto& bindingSlot = currentUnit.GetBindingSlot(targetR);
     auto textureObject = GetOrCreateTextureObject(texture);
     if (!textureObject) {
-        LOG_E("glBindTexture: Failed to get or create texture object for ID %d, it may be not tracked", texture);
+        LOG_W("glBindTexture: Failed to get or create texture object for ID %d, it may be not tracked", texture);
         return;
     }
     bindingSlot.Bind(textureObject);
@@ -1111,7 +1134,7 @@ void glDeleteTextures(GLsizei n, const GLuint* textures) {
 
 void glActiveTexture(GLenum texture) {
     LOG()
-    LOG_E("glActiveTexture, texture = %s", glEnumToString(texture))
+    LOG_D("glActiveTexture, texture = %s", glEnumToString(texture))
     if (texture < GL_TEXTURE0 || texture >= GL_TEXTURE0 + MAX_TEXTURE_IMAGE_UNITS) {
         LOG_E("Invalid texture enum: %s", glEnumToString(texture))
         return;
@@ -1125,7 +1148,7 @@ void glActiveTexture(GLenum texture) {
 
 void glGetTexImage(GLenum target, GLint level, GLenum format, GLenum type, void* pixels) {
     LOG()
-    LOG_E("glGetTexImage, target: 0x%x, level: %d, format: 0x%x, type: 0x%x, pixels: 0x%x", target, level, format, type,
+    LOG_D("glGetTexImage, target: 0x%x, level: %d, format: 0x%x, type: 0x%x, pixels: 0x%x", target, level, format, type,
           pixels)
     GLint prevDrawFBO;
     glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &prevDrawFBO);
@@ -1202,7 +1225,7 @@ void glGetTexImage(GLenum target, GLint level, GLenum format, GLenum type, void*
 
 void glReadPixels(GLint x, GLint y, GLsizei width, GLsizei height, GLenum format, GLenum type, void* pixels) {
     LOG()
-    LOG_E("glReadPixels, x=%d, y=%d, width=%d, height=%d, format=0x%x, "
+    LOG_D("glReadPixels, x=%d, y=%d, width=%d, height=%d, format=0x%x, "
           "type=0x%x, pixels=0x%x",
           x, y, width, height, format, type, pixels)
 
@@ -1213,7 +1236,7 @@ void glReadPixels(GLint x, GLint y, GLsizei width, GLsizei height, GLenum format
         format = GL_RGBA;
         type = GL_UNSIGNED_BYTE;
     }
-    LOG_E("glReadPixels converted, x=%d, y=%d, width=%d, height=%d, format=0x%x, "
+    LOG_D("glReadPixels converted, x=%d, y=%d, width=%d, height=%d, format=0x%x, "
           "type=0x%x, pixels=0x%x",
           x, y, width, height, format, type, pixels)
     GLES.glReadPixels(x, y, width, height, format, type, pixels);
@@ -1236,10 +1259,10 @@ void glReadPixels(GLint x, GLint y, GLsizei width, GLsizei height, GLenum format
 void glTexParameteri(GLenum target, GLenum pname, GLint param) {
     LOG()
     pname = pname_convert(pname);
-    LOG_E("glTexParameteri, pname: 0x%x", pname)
+    LOG_D("glTexParameteri, pname: 0x%x", pname)
 
     if (pname == GL_TEXTURE_LOD_BIAS_QCOM && !g_gles_caps.GL_QCOM_texture_lod_bias) {
-        LOG_E("Does not support GL_QCOM_texture_lod_bias, skipped!")
+        LOG_D("Does not support GL_QCOM_texture_lod_bias, skipped!")
         return;
     }
 
@@ -1249,7 +1272,7 @@ void glTexParameteri(GLenum target, GLenum pname, GLint param) {
 
 void glClearTexImage(GLuint texture, GLint level, GLenum format, GLenum type, const void* data) {
     LOG()
-    LOG_E("glClearTexImage, texture: %d, level: %d, format: %d, type: %d", texture, level, format, type)
+    LOG_D("glClearTexImage, texture: %d, level: %d, format: %d, type: %d", texture, level, format, type)
     INIT_CHECK_GL_ERROR_FORCE
     GLuint fbo, prevDrawFBO, prevReadFBO;
     glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, (int*)&prevDrawFBO);
@@ -1262,7 +1285,7 @@ void glClearTexImage(GLuint texture, GLint level, GLenum format, GLenum type, co
 
     CHECK_GL_ERROR_NO_INIT
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-        LOG_E("  -> exit")
+        LOG_D("  -> exit")
         glBindFramebuffer(GL_READ_FRAMEBUFFER, prevReadFBO);
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, prevDrawFBO);
         glDeleteFramebuffers(1, &fbo);
@@ -1314,7 +1337,7 @@ void glClearTexImage(GLuint texture, GLint level, GLenum format, GLenum type, co
 }
 
 void glPixelStorei(GLenum pname, GLint param) {
-    LOG_E("glPixelStorei, pname = %s, param = %d", glEnumToString(pname), param)
+    LOG_D("glPixelStorei, pname = %s, param = %d", glEnumToString(pname), param)
     GLES.glPixelStorei(pname, param);
     CHECK_GL_ERROR
 }

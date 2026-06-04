@@ -10,7 +10,7 @@ jobs:
     runs-on: macos-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           submodules: recursive
 
@@ -27,17 +27,25 @@ jobs:
           cmake --build build --config RelWithDebInfo --target mobileglues
           codesign -s - build/libmobileglues.dylib
 
+      - name: Delete old artifacts (Free up storage immediately)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "Finding old artifacts named MobileGlues-iOS-dylib..."
+          ARTIFACT_IDS=$(gh api repos/${{ github.repository }}/actions/artifacts --jq '.artifacts[] | select(.name == "MobileGlues-iOS-dylib") | .id')
+          for id in $ARTIFACT_IDS; do
+            echo "Deleting artifact ID: $id"
+            gh api -X DELETE repos/${{ github.repository }}/actions/artifacts/$id
+          done
+
+      - name: Prepare artifact folder structure
+        run: |
+          mkdir -p staging/MobileGlues
+          cp MobileGlues-cpp/build/libmobileglues.dylib staging/MobileGlues/
+
       - name: Upload lib
         uses: actions/upload-artifact@v4
         with:
           name: MobileGlues-iOS-dylib
-          path: MobileGlues-cpp/build/libmobileglues.dylib
+          path: staging
           retention-days: 1
-
-      - name: Delete old workflow runs
-        uses: Mattraks/delete-workflow-runs@v2
-        with:
-          token: ${{ github.token }}
-          repository: ${{ github.repository }} 
-          retain_days: 0
-          keep_minimum_runs: 1

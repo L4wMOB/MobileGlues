@@ -51,7 +51,7 @@ void init_settings() {
 
     // Partial error-ignore: skip harmless GL errors from Apple's Metal
     // translation layer.  This noticeably reduces per-frame CPU overhead.
-    global_settings.ignore_error = IgnoreErrorLevel::None;
+    global_settings.ignore_error = IgnoreErrorLevel::Partial;
 
     // Compute shaders cause disproportionate CPU overhead on tile-based GPUs
     // (all Apple Silicon).  Disable unless explicitly running on A15+.

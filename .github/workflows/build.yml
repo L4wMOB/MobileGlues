@@ -40,8 +40,8 @@ jobs:
 
       - name: Prepare artifact folder structure
         run: |
-          mkdir -p staging/MobileGlues
-          cp MobileGlues-cpp/build/libmobileglues.dylib staging/MobileGlues/
+          mkdir -p staging/MobileGlues-iOS-dylib
+          cp MobileGlues-cpp/build/libmobileglues.dylib staging/MobileGlues-iOS-dylib/
 
       - name: Upload lib
         uses: actions/upload-artifact@v4

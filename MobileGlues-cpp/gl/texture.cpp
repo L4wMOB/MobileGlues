@@ -581,32 +581,28 @@ void glTexImage2D(GLenum target, GLint level, GLint internalFormat, GLsizei widt
     tex->swizzle_param[2] = GL_BLUE;
     tex->swizzle_param[3] = GL_ALPHA;
 
-    if (transfer_format == GL_BGRA && tex->format != transfer_format && internalFormat == GL_RGBA8 && width <= 128 &&
-        height <= 128) { // xaero has 64x64 tiles...hack here
-        LOG_D("Detected GL_BGRA format @ tex = %d, do swizzle", tex->texture)
-        if (tex->swizzle_param[0] == 0) { // assert this as never called glTexParameteri(...,
-                                          // GL_TEXTURE_SWIZZLE_R, ...)
-            tex->swizzle_param[0] = GL_RED;
-            tex->swizzle_param[1] = GL_GREEN;
-            tex->swizzle_param[2] = GL_BLUE;
-            tex->swizzle_param[3] = GL_ALPHA;
+    // Handle Apple's GL_BGRA_EXT natively via CPU swizzling to prevent
+    // format mismatch errors and wrong colors, removing the old SWIZZLE hack.
+    std::vector<uint8_t> bgra_swizzle_buf;
+    if (transfer_format == GL_BGRA && pixels != nullptr && width > 0 && height > 0) {
+        if (type == GL_UNSIGNED_BYTE || type == GL_UNSIGNED_INT_8_8_8_8 || type == GL_UNSIGNED_INT_8_8_8_8_REV) {
+            LOG_V("[MG-DEBUG] glTexImage2D BGRA->RGBA swizzle tex=%d size=%dx%d", tex ? tex->texture : 0, width, height);
+            size_t pixel_count = (size_t)width * height;
+            bgra_swizzle_buf.resize(pixel_count * 4);
+            const uint8_t* src = reinterpret_cast<const uint8_t*>(pixels);
+            uint8_t* dst = bgra_swizzle_buf.data();
+            for (size_t i = 0; i < pixel_count; ++i) {
+                dst[0] = src[2]; // R = B
+                dst[1] = src[1]; // G = G
+                dst[2] = src[0]; // B = R
+                dst[3] = src[3]; // A = A
+                src += 4; dst += 4;
+            }
+            pixels = bgra_swizzle_buf.data();
+            format = GL_RGBA;
+            type = GL_UNSIGNED_BYTE;
+            transfer_format = GL_RGBA; // Mask the transfer format so it doesn't trigger other hacks
         }
-
-        GLint r = tex->swizzle_param[0];
-        GLint g = tex->swizzle_param[1];
-        GLint b = tex->swizzle_param[2];
-        GLint a = tex->swizzle_param[3];
-        tex->swizzle_param[0] = g;
-        tex->swizzle_param[1] = b;
-        tex->swizzle_param[2] = a;
-        tex->swizzle_param[3] = r;
-        tex->format = transfer_format;
-
-        GLES.glTexParameteri(target, GL_TEXTURE_SWIZZLE_R, tex->swizzle_param[0]);
-        GLES.glTexParameteri(target, GL_TEXTURE_SWIZZLE_G, tex->swizzle_param[1]);
-        GLES.glTexParameteri(target, GL_TEXTURE_SWIZZLE_B, tex->swizzle_param[2]);
-        GLES.glTexParameteri(target, GL_TEXTURE_SWIZZLE_A, tex->swizzle_param[3]);
-        CHECK_GL_ERROR
     }
 
     tex->format = format;
@@ -1054,12 +1050,29 @@ void glTexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, G
           glEnumToString(target), level, xoffset, yoffset, width, height, glEnumToString(format), glEnumToString(type),
           pixels)
 
-    if (format == GL_BGRA && (type == GL_UNSIGNED_INT_8_8_8_8 || type == GL_UNSIGNED_INT_8_8_8_8_REV)) {
-        glTexParameteri(target, GL_TEXTURE_SWIZZLE_R,  GL_BLUE);
-        glTexParameteri(target, GL_TEXTURE_SWIZZLE_B,  GL_RED);
+    GET_TEXTURE_OBJECT(target);
 
-        format = GL_RGBA;
-        type = GL_UNSIGNED_BYTE;
+    // Apple GL_BGRA fix via CPU swizzle
+    std::vector<uint8_t> bgra_swizzle_buf;
+    if (format == GL_BGRA && pixels != nullptr && width > 0 && height > 0) {
+        if (type == GL_UNSIGNED_BYTE || type == GL_UNSIGNED_INT_8_8_8_8 || type == GL_UNSIGNED_INT_8_8_8_8_REV) {
+            LOG_V("[MG-DEBUG] glTexSubImage2D BGRA->RGBA swizzle tex=%d off=%d,%d size=%dx%d",
+                  tex ? tex->texture : 0, xoffset, yoffset, width, height);
+            size_t pixel_count = (size_t)width * height;
+            bgra_swizzle_buf.resize(pixel_count * 4);
+            const uint8_t* src = reinterpret_cast<const uint8_t*>(pixels);
+            uint8_t* dst = bgra_swizzle_buf.data();
+            for (size_t i = 0; i < pixel_count; ++i) {
+                dst[0] = src[2]; // R = B
+                dst[1] = src[1]; // G = G
+                dst[2] = src[0]; // B = R
+                dst[3] = src[3]; // A = A
+                src += 4; dst += 4;
+            }
+            pixels = bgra_swizzle_buf.data();
+            format = GL_RGBA;
+            type = GL_UNSIGNED_BYTE;
+        }
     }
 
     // If this texture was promoted GL_RGB8->GL_RGBA8 (by internal_convert), but the
@@ -1067,7 +1080,6 @@ void glTexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, G
     // Detect this: if bound texture internal format is GL_RGBA8 and upload is GL_RGB
     // UNSIGNED_BYTE, repack pixels RGB->RGBA with alpha=255.
     if (format == GL_RGB && type == GL_UNSIGNED_BYTE && pixels != nullptr && width > 0 && height > 0) {
-        GET_TEXTURE_OBJECT(target);
         if (tex && tex->internal_format == GL_RGBA8) {
             LOG_V("[MG-DEBUG] glTexSubImage2D RGB->RGBA repack tex=%d off=%d,%d size=%dx%d",
                   tex->texture, xoffset, yoffset, width, height);

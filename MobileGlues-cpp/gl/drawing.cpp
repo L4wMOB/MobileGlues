@@ -111,6 +111,31 @@ void glDrawElements(GLenum mode, GLsizei count, GLenum type, const void* indices
     LOG()
     LOG_D("glDrawElements, mode: %d, count: %d, type: %d, indices: %p", mode, count, type, indices)
     prepareForDraw();
+    // DEBUG: log GUI-relevant draw calls (fbo=0 or blend enabled)
+    {
+        static int de_logged = 0;
+        if (de_logged < 200) {
+            GLint fbo = 0, prog = 0;
+            GLboolean blend = GL_FALSE;
+            GLES.glGetIntegerv(GL_FRAMEBUFFER_BINDING, &fbo);
+            blend = GLES.glIsEnabled(GL_BLEND);
+            if (fbo == 0 || blend == GL_TRUE) {
+                GLint blend_src = 0, blend_dst = 0;
+                GLboolean cmask[4] = {1,1,1,1};
+                GLES.glGetIntegerv(GL_CURRENT_PROGRAM, &prog);
+                GLES.glGetIntegerv(GL_BLEND_SRC_ALPHA, &blend_src);
+                GLES.glGetIntegerv(GL_BLEND_DST_ALPHA, &blend_dst);
+                GLES.glGetBooleanv(GL_COLOR_WRITEMASK, cmask);
+                GLint bound_tex = 0;
+                GLES.glGetIntegerv(GL_TEXTURE_BINDING_2D, &bound_tex);
+                LOG_V("[MG-GUI-DE#%d] mode=%d cnt=%d fbo=%d prog=%d tex2d=%d blend=%d(s=0x%x d=0x%x) cmask=%d%d%d%d",
+                      de_logged, mode, count, fbo, prog, bound_tex,
+                      blend, blend_src, blend_dst,
+                      cmask[0], cmask[1], cmask[2], cmask[3]);
+                de_logged++;
+            }
+        }
+    }
     GLES.glDrawElements(mode, count, type, indices);
     CHECK_GL_ERROR
 }

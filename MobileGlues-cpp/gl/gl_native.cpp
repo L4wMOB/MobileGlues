@@ -68,27 +68,31 @@ NATIVE_FUNCTION_HEAD(void, glDisable, GLenum cap)
 NATIVE_FUNCTION_HEAD(void, glDisableVertexAttribArray, GLuint index) NATIVE_FUNCTION_END_NO_RETURN(void, glDisableVertexAttribArray, index)
 NATIVE_FUNCTION_HEAD(void, glDrawArrays, GLenum mode, GLint first, GLsizei count)
     LOG_D("Use native function: %s @ glDrawArrays(...)", RENDERERNAME);
-    // Debug: log GL state for every glDrawArrays call to diagnose GUI transparency
-    // Uses LOG_V so it always prints regardless of DEBUG flag
+    // DEBUG: only log draws to FBO=0 (screen) or with blend enabled - these are GUI draws
     static int draw_call_count = 0;
+    static int logged_count = 0;
     draw_call_count++;
-    if (draw_call_count <= 200) { // cap to first 200 calls to avoid log flood
+    if (logged_count < 300) {
         GLint fbo = 0, prog = 0;
         GLboolean blend = GL_FALSE;
         GLint blend_src = 0, blend_dst = 0;
         GLboolean cmask[4] = {GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE};
         GLES.glGetIntegerv(GL_FRAMEBUFFER_BINDING, &fbo);
-        GLES.glGetIntegerv(GL_CURRENT_PROGRAM, &prog);
         blend = GLES.glIsEnabled(GL_BLEND);
-        GLES.glGetIntegerv(GL_BLEND_SRC_ALPHA, &blend_src);
-        GLES.glGetIntegerv(GL_BLEND_DST_ALPHA, &blend_dst);
-        GLES.glGetBooleanv(GL_COLOR_WRITEMASK, cmask);
-        GLint bound_tex = 0;
-        GLES.glGetIntegerv(GL_TEXTURE_BINDING_2D, &bound_tex);
-        LOG_V("[MG-DBG-DA#%d] mode=%d cnt=%d fbo=%d prog=%d tex2d=%d blend=%d(s=0x%x d=0x%x) cmask=%d%d%d%d",
-              draw_call_count, mode, count, fbo, prog, bound_tex,
-              blend, blend_src, blend_dst,
-              cmask[0], cmask[1], cmask[2], cmask[3]);
+        // Only log: FBO=0 (render to screen), OR blend enabled, OR small draws (likely GUI)
+        if (fbo == 0 || blend == GL_TRUE || (count > 0 && count <= 36)) {
+            GLES.glGetIntegerv(GL_CURRENT_PROGRAM, &prog);
+            GLES.glGetIntegerv(GL_BLEND_SRC_ALPHA, &blend_src);
+            GLES.glGetIntegerv(GL_BLEND_DST_ALPHA, &blend_dst);
+            GLES.glGetBooleanv(GL_COLOR_WRITEMASK, cmask);
+            GLint bound_tex = 0;
+            GLES.glGetIntegerv(GL_TEXTURE_BINDING_2D, &bound_tex);
+            LOG_V("[MG-GUI#%d/dc%d] mode=%d cnt=%d fbo=%d prog=%d tex2d=%d blend=%d(s=0x%x d=0x%x) cmask=%d%d%d%d",
+                  logged_count, draw_call_count, mode, count, fbo, prog, bound_tex,
+                  blend, blend_src, blend_dst,
+                  cmask[0], cmask[1], cmask[2], cmask[3]);
+            logged_count++;
+        }
     }
     GLES.glDrawArrays(mode, first, count);
 }

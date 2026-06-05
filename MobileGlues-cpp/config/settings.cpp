@@ -103,9 +103,9 @@ void init_settings() {
     //   and overrides basevertex=true if found (see Apple-specific block).
     //   This keeps OpenGL at 4.3 and makes Sodium work correctly.
     if (tier >= 2) {
-        global_settings.multidraw_mode = multidraw_mode_t::PreferBaseVertex;
+        global_settings.multidraw_mode = multidraw_mode_t::Compute;
     } else {
-        global_settings.multidraw_mode = multidraw_mode_t::PreferIndirect;
+        global_settings.multidraw_mode = multidraw_mode_t::DrawElements;
     }
 
     // FSR1 (FidelityFX Super Resolution 1.0):
